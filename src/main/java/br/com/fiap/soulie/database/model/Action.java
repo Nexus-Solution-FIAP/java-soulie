@@ -1,4 +1,4 @@
-package br.com.fiap.soulie.model;
+package br.com.fiap.soulie.database.model;
 
 public class Action {
 
