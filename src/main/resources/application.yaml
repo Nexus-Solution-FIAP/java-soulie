@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: "soulie"
+  datasource:
+    #    url: "jdbc:oracle:thin:${DB_HOST}:${DB_PORT}:${DB_NAME}"
+    #    username: "${DB_USER}"
+    #    password: "${DB_PASSWORD}"
+    #    driver-class-name: "oracle.jdbc.OracleDriver"
+    url: "jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    username: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    driver-class-name: "org.postgresql.Driver"
+  flyway:
+    baseline-on-migrate: true
+    baseline-version: 0
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+
+server:
+  error:
+    include-stacktracer: "never" # Por padrão ele já vem Never
+
+api:
+  security:
+    token:
+      secret_jwt: "${SECRET_JWT:SenhaReserva}"

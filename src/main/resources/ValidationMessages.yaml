@@ -1,0 +1,10 @@
+name:
+  mandatory: "Nome é obrigatório"
+
+email:
+  mandatory: "Email é obrigatório"
+  invalid: "Formato do email é inválido"
+
+password:
+  mandatory: "Senha é obrigatória"
+  invalid: "Formato da senha é inválido"
