@@ -3,14 +3,15 @@ package br.com.fiap.soulie.domain.avatar;
 
 import br.com.fiap.soulie.domain.avatar.enums.Humor;
 import br.com.fiap.soulie.domain.avatar.enums.PlantType;
-import br.com.fiap.soulie.domain.avatar.record.AvatarData;
-import br.com.fiap.soulie.domain.avatar.record.UpdateAvatar;
+import br.com.fiap.soulie.domain.avatar.dto.AvatarRequest;
+import br.com.fiap.soulie.domain.avatar.dto.UpdateAvatar;
 import br.com.fiap.soulie.domain.user.User;
 import jakarta.persistence.*;
 import jakarta.validation.Valid;
 import lombok.*;
 
 @Getter
+@Builder
 @EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
@@ -35,8 +36,8 @@ public class Avatar {
     @JoinColumn(name = "user_id")
     private User user;
 
-    public Avatar(AvatarData avatarData, User user) {
-        this.name = avatarData.name();
+    public Avatar(AvatarRequest avatarRequest, User user) {
+        this.name = avatarRequest.name();
         this.user = user;
         this.level = 0;
         this.humor = Humor.NEUTRAL;

@@ -1,15 +1,12 @@
-package br.com.fiap.soulie.domain.avatar.record;
+package br.com.fiap.soulie.domain.avatar.dto;
 
 import br.com.fiap.soulie.domain.avatar.enums.PlantType;
 import jakarta.validation.constraints.NotBlank;
 
-public record AvatarData(
+public record AvatarRequest(
 
         @NotBlank
         String name,
-
-        // @NotNull
-        Long userId,
 
         PlantType plantType
 ) {

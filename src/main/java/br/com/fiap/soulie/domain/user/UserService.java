@@ -1,9 +1,9 @@
 package br.com.fiap.soulie.domain.user;
 
 
-import br.com.fiap.soulie.domain.user.record.UpdateUserData;
-import br.com.fiap.soulie.domain.user.record.UserData;
-import br.com.fiap.soulie.domain.user.record.UserDataDetail;
+import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
+import br.com.fiap.soulie.domain.user.dto.UserRequest;
+import br.com.fiap.soulie.domain.user.dto.UserResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,46 +20,49 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private UserMapper mapper;
+
     // Get
-    public Page<UserDataDetail> listUsersDetails(Pageable pageable) {
-        return repository.findAllByActiveTrue(pageable).map(UserDataDetail::new);
+    public Page<UserResponse> listUsersDetails(Pageable pageable) {
+        return repository.findAllByActiveTrue(pageable).map(mapper::toDetail);
     }
 
-    public UserDataDetail userDetails(Long id){
+    public UserResponse userDetails(Long id){
         var user = repository.getReferenceById(id);
-        return new UserDataDetail(user);
+        return mapper.toDetail(user);
     }
 
     // Post
     @Transactional
-    public UserDataDetail registerUser(UserData userData) {
-        var user = new User(userData);
+    public UserResponse registerUser(UserRequest userRequest) {
+        var user = mapper.toEntity(userRequest);
         repository.save(user);
         user.encryptPassword(passwordEncoder);
-        return new UserDataDetail(user);
+        return mapper.toDetail(user);
     }
 
     // Put
     @Transactional
-    public UserDataDetail updateUser(UpdateUserData updateUserData) {
-        var user = repository.getReferenceById(updateUserData.id());
+    public UserResponse updateUser(UpdateUserData updateUserData, Long id) {
+        var user = repository.getReferenceById(id);
         user.updateData(updateUserData);
-        return new UserDataDetail(user);
+        return mapper.toDetail(user);
     }
 
     // Patch
     @Transactional
-    public UserDataDetail activeUser(Long id){
+    public UserResponse activeUser(Long id){
         var user = repository.getReferenceById(id);
         user.activateUser();
-        return new UserDataDetail(user);
+        return mapper.toDetail(user);
     }
 
     // Delete
     @Transactional
-    public UserDataDetail excludeUser(Long id) {
+    public UserResponse excludeUser(Long id) {
         var user = repository.getReferenceById(id);
         user.deleteUser();
-        return new UserDataDetail(user);
+        return mapper.toDetail(user);
     }
 }

@@ -1,13 +1,10 @@
 package br.com.fiap.soulie.domain.user;
 
-import br.com.fiap.soulie.domain.user.record.UpdateUserData;
-import br.com.fiap.soulie.domain.user.record.UserData;
+import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
+import br.com.fiap.soulie.domain.user.dto.UserRequest;
 import jakarta.persistence.*;
 import jakarta.validation.Valid;
-import lombok.AllArgsConstructor;
-import lombok.EqualsAndHashCode;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 
 @Getter
+@Builder
 @EqualsAndHashCode(of = "id")
 @NoArgsConstructor
 @AllArgsConstructor
@@ -33,14 +31,6 @@ public class User implements UserDetails {
     private String password;
     private int points;
     private Boolean active;
-
-    public User(UserData userData) {
-        this.name = userData.name();
-        this.email = userData.email();
-        this.password = userData.password();
-        this.points = 0;
-        this.active = true;
-    }
 
     public void updateData(@Valid UpdateUserData updateUserData) {
         if(updateUserData.name() != null ){

@@ -1,8 +1,8 @@
 package br.com.fiap.soulie.domain.avatar;
 
-import br.com.fiap.soulie.domain.avatar.record.AvatarData;
-import br.com.fiap.soulie.domain.avatar.record.AvatarDataDetail;
-import br.com.fiap.soulie.domain.avatar.record.UpdateAvatar;
+import br.com.fiap.soulie.domain.avatar.dto.AvatarRequest;
+import br.com.fiap.soulie.domain.avatar.dto.AvatarResponse;
+import br.com.fiap.soulie.domain.avatar.dto.UpdateAvatar;
 import br.com.fiap.soulie.domain.user.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ValidationException;
@@ -14,49 +14,41 @@ import org.springframework.transaction.annotation.Transactional;
 public class AvatarService {
 
     @Autowired
-    private AvatarRepository avatarRepository;
+    private AvatarRepository repository;
 
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private AvatarMapper mapper;
+
 
     // Get
-    public AvatarDataDetail avatarDetails(Long userId){
-        var avatar = avatarRepository.findByUserId(userId)
+    public AvatarResponse avatarDetails(Long userId){
+        var avatar = repository.findByUserId(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não possui Avatar"));
-        return new AvatarDataDetail(avatar);
-    }
-
-
-    // Post
-    @Transactional
-    public AvatarDataDetail createAvatar(AvatarData avatarData){
-        var user = userRepository.getReferenceById(avatarData.userId());
-        var avatar = new Avatar(avatarData, user);
-        avatarRepository.save(avatar);
-
-        return new AvatarDataDetail(avatar);
+        return mapper.toDetail(avatar);
     }
 
     @Transactional
-    public AvatarDataDetail createMyAvatar(AvatarData avatarData, Long userId){
-        if (avatarRepository.existsByUserId(userId)) {
+    public AvatarResponse createMyAvatar(AvatarRequest avatarRequest, Long userId){
+        if (repository.existsByUserId(userId)) {
             throw new ValidationException("Este usuário já possui um Avatar");
         }
         var user = userRepository.getReferenceById(userId);
-        var avatar = new Avatar(avatarData, user);
-        avatarRepository.save(avatar);
-        return new AvatarDataDetail(avatar);
+        var avatar = mapper.toEntity(avatarRequest, user);
+        repository.save(avatar);
+        return mapper.toDetail(avatar);
     }
 
     // Put
     @Transactional
-    public AvatarDataDetail updateMyAvatar(UpdateAvatar updateAvatar, Long userId){
-        var avatar = avatarRepository.findByUserId(userId)
+    public AvatarResponse updateMyAvatar(UpdateAvatar updateAvatar, Long userId){
+        var avatar = repository.findByUserId(userId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não possui Avatar"));
         avatar.updateAvatar(updateAvatar);
 
-        return new AvatarDataDetail(avatar);
+        return mapper.toDetail(avatar);
     }
 
 }

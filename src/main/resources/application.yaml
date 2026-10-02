@@ -21,7 +21,7 @@ spring:
 
 server:
   error:
-    include-stacktracer: "never" # Por padrão ele já vem Never
+    include-stacktracer: "never"
 
 api:
   security:

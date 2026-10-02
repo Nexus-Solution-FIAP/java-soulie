@@ -1,10 +1,10 @@
-package br.com.fiap.soulie.domain.user.record;
+package br.com.fiap.soulie.domain.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
-public record UserData(
+public record UserRequest(
 
 
         @NotBlank(message = "Nome é obrigatório")

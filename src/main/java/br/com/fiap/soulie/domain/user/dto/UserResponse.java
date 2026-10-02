@@ -1,8 +1,8 @@
-package br.com.fiap.soulie.domain.user.record;
+package br.com.fiap.soulie.domain.user.dto;
 
 import br.com.fiap.soulie.domain.user.User;
 
-public record UserDataDetail(
+public record UserResponse(
         Long id,
 
         String name,
@@ -14,7 +14,7 @@ public record UserDataDetail(
         Boolean active
 ) {
 
-    public UserDataDetail(User user){
+    public UserResponse(User user){
         this(
                 user.getId(),
                 user.getName(),
