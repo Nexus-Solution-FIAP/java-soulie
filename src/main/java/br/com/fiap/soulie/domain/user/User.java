@@ -1,5 +1,6 @@
 package br.com.fiap.soulie.domain.user;
 
+import br.com.fiap.soulie.domain.garden.Garden;
 import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
 import br.com.fiap.soulie.domain.user.dto.UserRequest;
 import jakarta.persistence.*;
@@ -11,7 +12,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Getter
 @Builder
@@ -31,6 +34,9 @@ public class User implements UserDetails {
     private String password;
     private int points;
     private Boolean active;
+
+    @ManyToMany(mappedBy = "users")
+    private Set<Garden> gardens =  new HashSet<>();
 
     public void updateData(@Valid UpdateUserData updateUserData) {
         if(updateUserData.name() != null ){
