@@ -1,10 +1,8 @@
 package br.com.fiap.soulie.domain.avatar.enums;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
-@AllArgsConstructor
 public enum Humor {
 
     WITHERED(1, "Murcho"),
@@ -15,4 +13,9 @@ public enum Humor {
 
     private final int id;
     private final String descricao;
+
+    Humor(int id, String descricao) {
+        this.id = id;
+        this.descricao = descricao;
+    }
 }

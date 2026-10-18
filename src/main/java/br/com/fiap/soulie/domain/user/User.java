@@ -11,16 +11,16 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
 @Getter
-@Builder
+@Setter
 @EqualsAndHashCode(of = "id")
-@NoArgsConstructor
-@AllArgsConstructor
 @Entity(name = "User")
 @Table(name = "users")
 public class User implements UserDetails {
@@ -35,8 +35,37 @@ public class User implements UserDetails {
     private int points;
     private Boolean active;
 
+    private String handle;
+
+    @Column(name = "avatar_url")
+    private String avatarUrl;
+
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "streak_days")
+    private int streakDays;
+
+    @Column(name = "last_activity_date")
+    private LocalDate lastActivityDate;
+
+    @Column(name = "co2_saved_kg")
+    private double co2SavedKg;
+
+    @Column(name = "water_saved_liters")
+    private double waterSavedLiters;
+
+    @Column(name = "notifications_enabled")
+    private Boolean notificationsEnabled;
+
+    @Column(name = "email_weekly_digest")
+    private Boolean emailWeeklyDigest;
+
     @ManyToMany(mappedBy = "users")
-    private Set<Garden> gardens =  new HashSet<>();
+    private Set<Garden> gardens = new HashSet<>();
+
+    public User() {
+    }
 
     public void updateData(@Valid UpdateUserData updateUserData) {
         if(updateUserData.name() != null ){
@@ -60,6 +89,72 @@ public class User implements UserDetails {
 
     public void activateUser() {
         this.active = true;
+    }
+
+    public void assignHandle(String handle) {
+        this.handle = handle;
+    }
+
+    public void updateSettings(Boolean notificationsEnabled, Boolean emailWeeklyDigest) {
+        if (notificationsEnabled != null) {
+            this.notificationsEnabled = notificationsEnabled;
+        }
+        if (emailWeeklyDigest != null) {
+            this.emailWeeklyDigest = emailWeeklyDigest;
+        }
+    }
+
+    public void addPoints(int xp) {
+        if (xp > 0) {
+            this.points += xp;
+        }
+    }
+
+    public void addImpact(double co2, double water) {
+        if (co2 > 0) {
+            this.co2SavedKg += co2;
+        }
+        if (water > 0) {
+            this.waterSavedLiters += water;
+        }
+    }
+
+    public void registerActivityDay(LocalDate today) {
+        if (today.equals(lastActivityDate)) {
+            return;
+        }
+        if (lastActivityDate != null && lastActivityDate.equals(today.minusDays(1))) {
+            streakDays += 1;
+        } else {
+            streakDays = 1;
+        }
+        lastActivityDate = today;
+    }
+
+    public int currentStreak(LocalDate today) {
+        if (lastActivityDate == null || streakDays <= 0) {
+            return 0;
+        }
+        if (lastActivityDate.equals(today) || lastActivityDate.equals(today.minusDays(1))) {
+            return streakDays;
+        }
+        return 0;
+    }
+
+    @PrePersist
+    void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
+        if (active == null) {
+            active = true;
+        }
+        if (notificationsEnabled == null) {
+            notificationsEnabled = true;
+        }
+        if (emailWeeklyDigest == null) {
+            emailWeeklyDigest = false;
+        }
     }
 
     @Override
@@ -94,7 +189,7 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return active == null || active;
     }
 
     public void encryptPassword(PasswordEncoder passwordEncoder) {

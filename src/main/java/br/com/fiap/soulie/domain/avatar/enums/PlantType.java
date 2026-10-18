@@ -1,10 +1,8 @@
 package br.com.fiap.soulie.domain.avatar.enums;
 
-import lombok.AllArgsConstructor;
 import lombok.Getter;
 
 @Getter
-@AllArgsConstructor
 public enum PlantType {
     IPE_AMARELO(1, "Ipê Amarelo", "O nome vem do tupi 'ypê', que significa 'casca grossa'. Árvore da Mata Atlântica e do Cerrado, é a flor nacional do Brasil e floresce no auge da seca, quando perde todas as folhas. Encontrada do Sudeste ao Sul e no Centro-Oeste."),
     GUAIMBE_ONDULADO(2, "Guaimbê-ondulado", "Guaimbê vem do tupi e nomeia as plantas que se agarram nos troncos. Vive como epífita na Mata Atlântica, subindo pelas árvores em busca de luz, com folhas de bordas onduladas. Típica do Sul e do Sudeste."),
@@ -20,4 +18,10 @@ public enum PlantType {
     private final int id;
     private final String name;
     private final String origin;
+
+    PlantType(int id, String name, String origin) {
+        this.id = id;
+        this.name = name;
+        this.origin = origin;
+    }
 }

@@ -16,4 +16,6 @@ public interface AvatarRepository extends JpaRepository<Avatar, Long> {
 
     @EntityGraph(attributePaths = "user")
     List<Avatar> findAllByUserGardensId(Long gardenId);
+
+    List<Avatar> findByUserIdIn(Collection<Long> userIds);
 }

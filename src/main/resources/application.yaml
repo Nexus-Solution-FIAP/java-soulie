@@ -11,8 +11,13 @@ spring:
     password: "${DB_PASSWORD}"
     driver-class-name: "org.postgresql.Driver"
   flyway:
+    locations: classpath:db.migrations
     baseline-on-migrate: true
     baseline-version: 0
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
   jpa:
     show-sql: true
     properties:

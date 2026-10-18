@@ -13,5 +13,15 @@ public interface UserMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "points", constant = "0")
     @Mapping(target = "active", constant = "true")
+    @Mapping(target = "handle", ignore = true)
+    @Mapping(target = "avatarUrl", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    @Mapping(target = "streakDays", constant = "0")
+    @Mapping(target = "lastActivityDate", ignore = true)
+    @Mapping(target = "co2SavedKg", constant = "0")
+    @Mapping(target = "waterSavedLiters", constant = "0")
+    @Mapping(target = "notificationsEnabled", constant = "true")
+    @Mapping(target = "emailWeeklyDigest", constant = "false")
+    @Mapping(target = "gardens", ignore = true)
     User toEntity(UserRequest userRequest);
 }

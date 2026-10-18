@@ -8,10 +8,8 @@ import java.util.HashSet;
 import java.util.Set;
 
 @Getter
-@Builder
+@Setter
 @EqualsAndHashCode(of = "id")
-@NoArgsConstructor
-@AllArgsConstructor
 @Entity(name = "Garden")
 @Table(name = "gardens")
 public class Garden {
@@ -32,8 +30,10 @@ public class Garden {
             joinColumns = @JoinColumn(name = "garden_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
-    @Builder.Default
     private Set<User> users = new HashSet<>();
+
+    public Garden() {
+    }
 
     public void addUserToGarden(User user) {
         this.users.add(user);

@@ -1,6 +1,8 @@
 package br.com.fiap.soulie.domain.user;
 
 
+import br.com.fiap.soulie.domain.avatar.Avatar;
+import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
 import br.com.fiap.soulie.domain.user.dto.UserRequest;
 import br.com.fiap.soulie.domain.user.dto.UserResponse;
@@ -23,6 +25,9 @@ public class UserService {
     @Autowired
     private UserMapper mapper;
 
+    @Autowired
+    private AvatarRepository avatarRepository;
+
     // Get
     public Page<UserResponse> listUsersDetails(Pageable pageable) {
         return repository.findAllByActiveTrue(pageable).map(mapper::toDetail);
@@ -37,8 +42,10 @@ public class UserService {
     @Transactional
     public UserResponse registerUser(UserRequest userRequest) {
         var user = mapper.toEntity(userRequest);
+        user.assignHandle(uniqueHandle(userRequest.email()));
         repository.save(user);
         user.encryptPassword(passwordEncoder);
+        avatarRepository.save(Avatar.starter(user));
         return mapper.toDetail(user);
     }
 
@@ -64,5 +71,19 @@ public class UserService {
         var user = repository.getReferenceById(id);
         user.deleteUser();
         return mapper.toDetail(user);
+    }
+
+    private String uniqueHandle(String email) {
+        String local = email.contains("@") ? email.substring(0, email.indexOf('@')) : email;
+        String base = local.replaceAll("[^a-zA-Z0-9]", "").toLowerCase();
+        if (base.isBlank()) {
+            base = "soulie";
+        }
+        String candidate = "@" + base;
+        int suffix = 1;
+        while (repository.existsByHandle(candidate)) {
+            candidate = "@" + base + suffix++;
+        }
+        return candidate;
     }
 }

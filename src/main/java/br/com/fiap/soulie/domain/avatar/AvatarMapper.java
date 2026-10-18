@@ -16,6 +16,10 @@ public interface AvatarMapper {
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "name", source = "avatarRequest.name")
     @Mapping(target = "humor", constant = "NEUTRAL")
+    @Mapping(target = "level", constant = "0")
+    @Mapping(target = "xp", constant = "0")
+    @Mapping(target = "flowerType", constant = "GIRASSOL")
+    @Mapping(target = "lastWateredAt", ignore = true)
     Avatar toEntity(AvatarRequest avatarRequest, User user);
 
 }
