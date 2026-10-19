@@ -5,7 +5,10 @@ import br.com.fiap.soulie.domain.user.UserService;
 import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
 import br.com.fiap.soulie.domain.user.dto.UserRequest;
 import br.com.fiap.soulie.domain.user.dto.UserResponse;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.security.SecurityRequirements;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -19,6 +22,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RestController
 @RequestMapping("/user")
 @SecurityRequirement(name = "bearer-key")
+@Tag(name = "Usuários", description = "Cadastro público e consulta da conta. O app novo usa o grupo Perfil.")
 public class UserController {
 
     @Autowired
@@ -37,6 +41,8 @@ public class UserController {
     }
 
     @PostMapping
+    @SecurityRequirements
+    @Operation(summary = "Cadastra uma conta", description = "Não precisa de token. Depois chame POST /login. A senha de exemplo é Soulie@2026.")
     public ResponseEntity<UserResponse> registerUser(@RequestBody @Valid UserRequest userRequest,
                                                      UriComponentsBuilder uriBuilder) {
         var detail = service.registerUser(userRequest);

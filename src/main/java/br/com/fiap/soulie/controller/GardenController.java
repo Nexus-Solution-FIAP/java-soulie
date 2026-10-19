@@ -7,6 +7,7 @@ import br.com.fiap.soulie.domain.garden.dto.GardenRequest;
 import br.com.fiap.soulie.domain.garden.dto.GardenResponse;
 import br.com.fiap.soulie.domain.user.User;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -18,6 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/garden")
 @SecurityRequirement(name = "bearer-key")
+@Tag(name = "Jardim (legado)", description = "Contrato antigo de grupos. O app usa Comunidade /garden.")
 public class GardenController {
 
     @Autowired

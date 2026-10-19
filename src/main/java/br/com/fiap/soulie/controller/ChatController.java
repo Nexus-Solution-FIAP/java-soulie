@@ -4,7 +4,10 @@ import br.com.fiap.soulie.api.dto.ChatReply;
 import br.com.fiap.soulie.api.dto.ChatRequest;
 import br.com.fiap.soulie.domain.chat.ChatApiService;
 import br.com.fiap.soulie.domain.user.User;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,13 +19,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping({"/api/v1/chat", "/v1/chat"})
 @SecurityRequirement(name = "bearer-key")
+@Tag(name = "Soulie IA", description = "Respostas a partir das missões abertas e do ranking real")
 public class ChatController {
 
     @Autowired
     private ChatApiService chatApiService;
 
     @PostMapping("/soulie-ia")
-    public ResponseEntity<ChatReply> soulieIa(@AuthenticationPrincipal User user, @RequestBody ChatRequest request) {
+    @Operation(summary = "Pergunta para a Soulie IA", description = "Envie a mensagem e, se a tela tiver uma missão aberta, o contexto dela.")
+    public ResponseEntity<ChatReply> soulieIa(@Parameter(hidden = true) @AuthenticationPrincipal User user, @RequestBody ChatRequest request) {
         return ResponseEntity.ok(chatApiService.reply(user, request));
     }
 }

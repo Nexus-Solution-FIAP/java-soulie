@@ -1,17 +1,19 @@
 package br.com.fiap.soulie.api.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
+
 public record FeedPostResponse(
-        Long id,
-        String author,
-        String avatarLetter,
-        String avatarColor,
-        String text,
-        String time,
-        long likes,
-        int comments,
-        boolean liked,
-        String imageUri,
-        String missionName,
-        Integer xp
+        @Schema(example = "8") Long id,
+        @Schema(example = "Arthur") String author,
+        @Schema(example = "A") String avatarLetter,
+        @Schema(example = "#0EA5E9") String avatarColor,
+        @Schema(example = "Fui de bike até a FIAP.") String text,
+        @Schema(example = "agora") String time,
+        @Schema(example = "2") long likes,
+        @Schema(example = "1") int comments,
+        @Schema(example = "false") boolean liked,
+        @Schema(example = "file:///foto.jpg") String imageUri,
+        @Schema(example = "Ir de bike") String missionName,
+        @Schema(example = "40") Integer xp
 ) {
 }
