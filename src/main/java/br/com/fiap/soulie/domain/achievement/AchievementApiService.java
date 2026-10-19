@@ -43,12 +43,11 @@ public class AchievementApiService {
             changed = false;
             userRepository.saveAndFlush(user);
             avatarRepository.saveAndFlush(avatar);
-            int rank = (int) userRepository.countByActiveTrueAndPointsGreaterThan(user.getPoints()) + 1;
             for (Achievement achievement : catalog) {
                 UserAchievement row = userAchievementRepository
                         .findByUser_IdAndAchievement_Id(user.getId(), achievement.getId())
                         .orElseGet(() -> userAchievementRepository.save(UserAchievement.start(user, achievement)));
-                int progress = progressOf(achievement, user, avatar, rank);
+                int progress = progressOf(achievement, user, avatar);
                 row.updateProgress(progress);
                 if (achievement.reached(progress) && row.unlock(LocalDateTime.now())) {
                     user.addPoints(achievement.getXpReward());
@@ -92,14 +91,28 @@ public class AchievementApiService {
         );
     }
 
-    private int progressOf(Achievement achievement, User user, Avatar avatar, int rank) {
+    private int progressOf(Achievement achievement, User user, Avatar avatar) {
         return switch (achievement.getMetric()) {
             case MISSION_TAG -> (int) completionRepository.countByUser_IdAndMission_Tag(user.getId(), achievement.getMetricKey());
             case STREAK_DAYS -> user.currentStreak(java.time.LocalDate.now());
             case WATER_LITERS -> (int) Math.floor(user.getWaterSavedLiters());
             case SOULIE_LEVEL -> avatar.getLevel();
-            case GLOBAL_RANK -> rank;
+            case GLOBAL_RANK -> gardenRank(user);
         };
+    }
+
+    /** 1º lugar só conta quando existe disputa. Sozinho no jardim, o progresso fica em zero. */
+    private int gardenRank(User user) {
+        var users = userRepository.findAllByActiveTrueOrderByPointsDescIdAsc();
+        if (users.size() < 2) {
+            return 0;
+        }
+        for (int index = 0; index < users.size(); index++) {
+            if (users.get(index).getId().equals(user.getId())) {
+                return index + 1;
+            }
+        }
+        return 0;
     }
 
     private String progressLabel(Achievement achievement, int progress) {
@@ -108,7 +121,7 @@ public class AchievementApiService {
             case WATER_LITERS -> progress + "L / " + target + "L";
             case STREAK_DAYS -> progress + "d / " + target + "d";
             case SOULIE_LEVEL -> "Nível " + progress + " / " + target;
-            case GLOBAL_RANK -> achievement.reached(progress) ? "Top " + target : "Fora do top " + target;
+            case GLOBAL_RANK -> progress <= 0 ? "Sem disputa" : progress + "º lugar";
             case MISSION_TAG -> progress + " / " + target;
         };
     }
