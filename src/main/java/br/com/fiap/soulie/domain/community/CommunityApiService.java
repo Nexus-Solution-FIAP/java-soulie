@@ -1,6 +1,7 @@
 package br.com.fiap.soulie.domain.community;
 
 import br.com.fiap.soulie.api.TimeLabels;
+import br.com.fiap.soulie.api.dto.GardenImpactResponse;
 import br.com.fiap.soulie.api.dto.CreateCommentRequest;
 import br.com.fiap.soulie.api.dto.CreateFeedRequest;
 import br.com.fiap.soulie.api.dto.FeedCommentResponse;
@@ -14,6 +15,8 @@ import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.avatar.enums.FlowerType;
 import br.com.fiap.soulie.domain.garden.Garden;
 import br.com.fiap.soulie.domain.garden.GardenService;
+import br.com.fiap.soulie.domain.mission.MissionImpact;
+import br.com.fiap.soulie.domain.mission.UserMissionCompletionRepository;
 import br.com.fiap.soulie.domain.soulie.SoulieLevel;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
@@ -59,6 +62,9 @@ public class CommunityApiService {
 
     @Autowired
     private GardenService gardenService;
+
+    @Autowired
+    private UserMissionCompletionRepository completionRepository;
 
     @Transactional(readOnly = true)
     public List<RankingItemResponse> ranking(User current) {
@@ -216,6 +222,44 @@ public class CommunityApiService {
                 post.getMissionName(),
                 post.getXp()
         );
+    }
+
+    @Transactional(readOnly = true)
+    public GardenImpactResponse gardenImpact(User current) {
+        var garden = gardenService.findMine(current);
+        if (garden.isEmpty()) {
+            return new GardenImpactResponse(0, 0, 0, 0, 0);
+        }
+        List<Long> memberIds = garden.get().getUsers().stream()
+                .filter(member -> member.getActive() == null || member.getActive())
+                .map(User::getId)
+                .toList();
+        if (memberIds.isEmpty()) {
+            return new GardenImpactResponse(0, 0, 0, 0, 0);
+        }
+
+        double co2 = 0;
+        double recycled = 0;
+        double transit = 0;
+        double water = 0;
+        long actions = 0;
+        for (Object[] row : completionRepository.countGroupedByMissionName(memberIds)) {
+            String name = (String) row[0];
+            long count = ((Number) row[1]).longValue();
+            MissionImpact.Factors factors = MissionImpact.of(name);
+            actions += count;
+            co2 += factors.co2Kg() * count;
+            recycled += factors.recycledKg() * count;
+            water += factors.waterLiters() * count;
+            if ("Transporte Público".equals(name)) {
+                transit += factors.co2Kg() * count;
+            }
+        }
+        return new GardenImpactResponse(round(co2), round(recycled), round(transit), round(water), actions);
+    }
+
+    private double round(double value) {
+        return Math.round(value * 100.0) / 100.0;
     }
 
     private FeedPost postInGarden(User current, Long postId) {

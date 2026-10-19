@@ -3,6 +3,7 @@ package br.com.fiap.soulie.controller;
 import br.com.fiap.soulie.api.dto.CommunityGardenResponse;
 import br.com.fiap.soulie.api.dto.CreateCommentRequest;
 import br.com.fiap.soulie.api.dto.CreateFeedRequest;
+import br.com.fiap.soulie.api.dto.GardenImpactResponse;
 import br.com.fiap.soulie.api.dto.FeedCommentResponse;
 import br.com.fiap.soulie.api.dto.FeedPostResponse;
 import br.com.fiap.soulie.api.dto.JoinGardenRequest;
@@ -88,6 +89,11 @@ public class CommunityController {
     public ResponseEntity<CommunityGardenResponse> joinGarden(@AuthenticationPrincipal User user,
                                                               @RequestBody JoinGardenRequest request) {
         return ResponseEntity.ok(gardenService.join(user, request == null ? null : request.code()));
+    }
+
+    @GetMapping("/garden/impact")
+    public ResponseEntity<GardenImpactResponse> gardenImpact(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(communityApiService.gardenImpact(user));
     }
 
     @DeleteMapping("/garden")

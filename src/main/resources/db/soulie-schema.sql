@@ -235,16 +235,16 @@ CREATE TABLE feed_likes
 );
 
 INSERT INTO daily_missions (emoji, name, tag, description, xp, co2_saved_kg, water_saved_liters)
-VALUES ('♻️', 'Reciclar Resíduos', 'Reciclagem', 'Separe lixo reciclável corretamente', 30, 1.2, 0),
-       ('🚌', 'Transporte Público', 'Mobilidade', 'Use ônibus, metrô ou bicicleta', 40, 2.0, 0),
-       ('💧', 'Economia de Água', 'Água', 'Banho menor que 5 minutos', 25, 0.3, 60),
-       ('🛍️', 'Compra Consciente', 'Consumo', 'Evite embalagem plástica desnecessária', 20, 0.4, 0),
-       ('⚡', 'Energia Limpa', 'Energia', 'Desligue aparelhos em standby', 15, 0.8, 0),
-       ('🌱', 'Compostagem', 'Resíduos', 'Faça compostagem do lixo orgânico', 45, 1.5, 0),
-       ('🥦', 'Refeição Sem Carne', 'Alimentação', 'Tenha pelo menos uma refeição vegetariana', 30, 1.0, 0),
-       ('💡', 'Luz Natural', 'Energia', 'Aproveite a luz do sol e apague as luzes', 20, 0.5, 0),
-       ('🌻', 'Plantar uma Muda', 'Natureza', 'Plante uma muda ou cultive uma horta', 50, 2.5, 0),
-       ('🥤', 'Zero Descartáveis', 'Consumo', 'Use copo ou garrafa reutilizável hoje', 25, 0.6, 0);
+VALUES ('♻️', 'Reciclar Resíduos', 'Reciclagem', 'Separe lixo reciclável corretamente', 30, 0.35, 0),
+       ('🚌', 'Transporte Público', 'Mobilidade', 'Use ônibus, metrô ou bicicleta', 40, 1.60, 0),
+       ('💧', 'Economia de Água', 'Água', 'Banho menor que 5 minutos', 25, 0.12, 60),
+       ('🛍️', 'Compra Consciente', 'Consumo', 'Evite embalagem plástica desnecessária', 20, 0.25, 0),
+       ('⚡', 'Energia Limpa', 'Energia', 'Desligue aparelhos em standby', 15, 0.12, 0),
+       ('🌱', 'Compostagem', 'Resíduos', 'Faça compostagem do lixo orgânico', 45, 0.50, 0),
+       ('🥦', 'Refeição Sem Carne', 'Alimentação', 'Tenha pelo menos uma refeição vegetariana', 30, 1.50, 0),
+       ('💡', 'Luz Natural', 'Energia', 'Aproveite a luz do sol e apague as luzes', 20, 0.04, 0),
+       ('🌻', 'Plantar uma Muda', 'Natureza', 'Plante uma muda ou cultive uma horta', 50, 2.00, 0),
+       ('🥤', 'Zero Descartáveis', 'Consumo', 'Use copo ou garrafa reutilizável hoje', 25, 0.15, 0);
 
 INSERT INTO achievements (name, description, icon, color, category, xp_reward, target, metric, metric_key)
 VALUES ('Reciclador Consciente', 'Realizou 10 reciclagens registradas no app', 'recycle', '#10B981', 'Sustentabilidade', 50, 10, 'MISSION_TAG', 'Reciclagem'),
