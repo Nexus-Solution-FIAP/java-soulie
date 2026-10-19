@@ -14,7 +14,9 @@ public interface GardenMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "users", ignore = true)
+    @Mapping(target = "inviteCode", ignore = true)
     Garden toGarden(GardenRequest request);
 
+    @Mapping(target = "inviteCode", ignore = true)
     GardenResponse toGardenAvatarResponse(Avatar avatar);
 }

@@ -1,5 +1,6 @@
 package br.com.fiap.soulie.domain.community;
 
+import br.com.fiap.soulie.domain.garden.Garden;
 import br.com.fiap.soulie.domain.user.User;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -19,6 +20,10 @@ public class FeedPost {
     @JoinColumn(name = "user_id")
     private User author;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "garden_id")
+    private Garden garden;
+
     @Column(nullable = false, length = 2000)
     private String text;
 
@@ -36,9 +41,10 @@ public class FeedPost {
     public FeedPost() {
     }
 
-    public static FeedPost create(User author, String text, String imageUri, String missionName, Integer xp) {
+    public static FeedPost create(User author, Garden garden, String text, String imageUri, String missionName, Integer xp) {
         var post = new FeedPost();
         post.author = author;
+        post.garden = garden;
         post.text = text.trim();
         post.imageUri = imageUri;
         post.missionName = missionName;

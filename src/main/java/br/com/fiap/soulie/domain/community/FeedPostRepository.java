@@ -6,4 +6,6 @@ import java.util.List;
 
 public interface FeedPostRepository extends JpaRepository<FeedPost, Long> {
     List<FeedPost> findAllByOrderByCreatedAtDesc();
+
+    List<FeedPost> findAllByGarden_IdOrderByCreatedAtDesc(Long gardenId);
 }

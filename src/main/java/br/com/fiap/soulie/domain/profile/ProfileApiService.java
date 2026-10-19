@@ -7,7 +7,7 @@ import br.com.fiap.soulie.api.dto.UserSettingsResponse;
 import br.com.fiap.soulie.api.dto.UserStatsResponse;
 import br.com.fiap.soulie.domain.achievement.AchievementApiService;
 import br.com.fiap.soulie.domain.achievement.UserAchievementRepository;
-import br.com.fiap.soulie.domain.garden.Garden;
+import br.com.fiap.soulie.domain.garden.GardenService;
 import br.com.fiap.soulie.domain.soulie.SoulieApiService;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
@@ -15,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -23,6 +22,9 @@ public class ProfileApiService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private GardenService gardenService;
 
     @Autowired
     private UserAchievementRepository userAchievementRepository;
@@ -76,11 +78,8 @@ public class ProfileApiService {
     }
 
     private Standing friendsStanding(User user) {
-        List<User> group = gardenMates(user);
+        List<User> group = gardenService.members(user);
         if (group.size() <= 1) {
-            group = userRepository.findAllByActiveTrueOrderByPointsDescIdAsc();
-        }
-        if (group.isEmpty()) {
             return new Standing(1, 0);
         }
         int leaderXp = group.get(0).getPoints();
@@ -92,19 +91,6 @@ public class ProfileApiService {
             position++;
         }
         return new Standing(position, Math.max(0, leaderXp - user.getPoints()));
-    }
-
-    private List<User> gardenMates(User user) {
-        if (user.getGardens() == null || user.getGardens().isEmpty()) {
-            return List.of(user);
-        }
-        return user.getGardens().stream()
-                .map(Garden::getUsers)
-                .flatMap(java.util.Set::stream)
-                .filter(member -> member.getActive() == null || member.getActive())
-                .distinct()
-                .sorted(Comparator.comparingInt(User::getPoints).reversed().thenComparing(User::getId))
-                .toList();
     }
 
     private record Standing(int position, int xpToFirst) {

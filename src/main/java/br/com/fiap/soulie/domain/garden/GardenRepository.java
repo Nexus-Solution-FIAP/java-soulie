@@ -12,6 +12,14 @@ public interface GardenRepository extends JpaRepository<Garden, Long> {
     List<Garden> findAllByUsersId(Long userId);
 
     @EntityGraph(attributePaths = "users")
+    List<Garden> findAllByUsersIdOrderByIdAsc(Long userId);
+
+    @EntityGraph(attributePaths = "users")
+    Optional<Garden> findByInviteCode(String inviteCode);
+
+    boolean existsByInviteCode(String inviteCode);
+
+    @EntityGraph(attributePaths = "users")
     Optional<Garden> findByIdAndUsersId(Long gardenId, Long userId);
 
     Boolean existsByIdAndUsersId(Long gardenId, Long userId);

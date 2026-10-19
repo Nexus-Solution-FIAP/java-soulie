@@ -10,6 +10,8 @@ public record GardenResponse(
 
         String name,
 
+        String inviteCode,
+
         List<UserResponse> users
 ) {
 }

@@ -1,13 +1,19 @@
 package br.com.fiap.soulie.domain.community;
 
 import br.com.fiap.soulie.api.TimeLabels;
+import br.com.fiap.soulie.api.dto.CreateCommentRequest;
 import br.com.fiap.soulie.api.dto.CreateFeedRequest;
+import br.com.fiap.soulie.api.dto.FeedCommentResponse;
 import br.com.fiap.soulie.api.dto.FeedPostResponse;
 import br.com.fiap.soulie.api.dto.LikeResponse;
+import br.com.fiap.soulie.api.dto.NotificationResponse;
+import br.com.fiap.soulie.api.dto.NudgeResponse;
 import br.com.fiap.soulie.api.dto.RankingItemResponse;
 import br.com.fiap.soulie.domain.avatar.Avatar;
 import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.avatar.enums.FlowerType;
+import br.com.fiap.soulie.domain.garden.Garden;
+import br.com.fiap.soulie.domain.garden.GardenService;
 import br.com.fiap.soulie.domain.soulie.SoulieLevel;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
@@ -17,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -25,6 +33,7 @@ import java.util.stream.Collectors;
 @Service
 public class CommunityApiService {
 
+    private static final int NUDGES_PER_FRIEND_PER_DAY = 3;
     private static final String[] COLORS = {"#0EA5E9", "#10B981", "#F43F5E", "#8B5CF6", "#F59E0B", "#06B6D4"};
 
     @Autowired
@@ -39,9 +48,21 @@ public class CommunityApiService {
     @Autowired
     private FeedLikeRepository feedLikeRepository;
 
+    @Autowired
+    private FeedCommentRepository feedCommentRepository;
+
+    @Autowired
+    private InteractionRepository interactionRepository;
+
+    @Autowired
+    private UserNotificationRepository notificationRepository;
+
+    @Autowired
+    private GardenService gardenService;
+
     @Transactional(readOnly = true)
     public List<RankingItemResponse> ranking(User current) {
-        List<User> users = userRepository.findAllByActiveTrueOrderByPointsDescIdAsc();
+        List<User> users = gardenService.members(current);
         Map<Long, Avatar> avatars = avatarRepository.findByUserIdIn(users.stream().map(User::getId).toList()).stream()
                 .collect(Collectors.toMap(avatar -> avatar.getUser().getId(), Function.identity(), (left, right) -> left));
         int position = 1;
@@ -67,9 +88,11 @@ public class CommunityApiService {
 
     @Transactional(readOnly = true)
     public List<FeedPostResponse> feed(User current) {
-        return feedPostRepository.findAllByOrderByCreatedAtDesc().stream()
-                .map(post -> toResponse(post, current))
-                .toList();
+        return gardenService.findMine(current)
+                .map(garden -> feedPostRepository.findAllByGarden_IdOrderByCreatedAtDesc(garden.getId()).stream()
+                        .map(post -> toResponse(post, current))
+                        .toList())
+                .orElseGet(List::of);
     }
 
     @Transactional
@@ -79,6 +102,7 @@ public class CommunityApiService {
         }
         FeedPost post = feedPostRepository.save(FeedPost.create(
                 current,
+                gardenService.requireGarden(current),
                 request.text(),
                 request.imageUri(),
                 request.missionName(),
@@ -89,8 +113,7 @@ public class CommunityApiService {
 
     @Transactional
     public LikeResponse toggleLike(User current, Long postId) {
-        FeedPost post = feedPostRepository.findById(postId)
-                .orElseThrow(() -> new EntityNotFoundException("Publicação não encontrada"));
+        FeedPost post = postInGarden(current, postId);
         var existing = feedLikeRepository.findByPost_IdAndUser_Id(postId, current.getId());
         boolean liked;
         if (existing.isPresent()) {
@@ -101,6 +124,79 @@ public class CommunityApiService {
             liked = true;
         }
         return new LikeResponse(liked, feedLikeRepository.countByPost_Id(postId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<FeedCommentResponse> comments(User current, Long postId) {
+        FeedPost post = postInGarden(current, postId);
+        return feedCommentRepository.findAllByPost_IdOrderByCreatedAtAsc(post.getId()).stream()
+                .map(this::toComment)
+                .toList();
+    }
+
+    @Transactional
+    public FeedCommentResponse comment(User current, Long postId, CreateCommentRequest request) {
+        if (request == null || request.text() == null || request.text().isBlank()) {
+            throw new ValidationException("Escreva uma mensagem");
+        }
+        if (request.text().trim().length() > 1000) {
+            throw new ValidationException("A mensagem pode ter no máximo 1000 caracteres");
+        }
+        FeedPost post = postInGarden(current, postId);
+        FeedComment saved = feedCommentRepository.save(FeedComment.create(post, current, request.text()));
+        return toComment(saved);
+    }
+
+    @Transactional
+    public NudgeResponse nudge(User current, Long targetId) {
+        if (targetId == null || targetId.equals(current.getId())) {
+            throw new ValidationException("Escolha um amigo do jardim");
+        }
+        Garden garden = gardenService.findMine(current)
+                .orElseThrow(() -> new ValidationException("Entre em um jardim para cutucar um amigo"));
+        boolean member = garden.getUsers().stream()
+                .anyMatch(user -> user.getId().equals(targetId) && (user.getActive() == null || user.getActive()));
+        if (!member) {
+            throw new ValidationException("Essa pessoa não está no seu jardim");
+        }
+        User target = userRepository.findById(targetId)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        long used = interactionRepository.countBySender_IdAndReceiver_IdAndKindAndCreatedAtGreaterThanEqual(
+                current.getId(),
+                targetId,
+                Interaction.NUDGE,
+                LocalDate.now().atStartOfDay()
+        );
+        if (used >= NUDGES_PER_FRIEND_PER_DAY) {
+            throw new ValidationException("Você já cutucou essa pessoa 3 vezes hoje");
+        }
+        interactionRepository.save(Interaction.nudge(current, target));
+        if (target.getNotificationsEnabled() == null || target.getNotificationsEnabled()) {
+            notificationRepository.save(UserNotification.nudge(target, current.getName()));
+        }
+        return new NudgeResponse((int) (NUDGES_PER_FRIEND_PER_DAY - used - 1));
+    }
+
+    @Transactional(readOnly = true)
+    public List<NotificationResponse> notifications(User current) {
+        return notificationRepository.findAllByUser_IdAndReadAtIsNullOrderByCreatedAtAsc(current.getId()).stream()
+                .map(notification -> new NotificationResponse(
+                        notification.getId(),
+                        notification.getTitle(),
+                        notification.getBody(),
+                        TimeLabels.feedTime(notification.getCreatedAt())
+                ))
+                .toList();
+    }
+
+    @Transactional
+    public void markNotificationsRead(User current, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        notificationRepository.findAllByUser_IdAndIdIn(current.getId(), ids)
+                .forEach(notification -> notification.markRead(now));
     }
 
     private FeedPostResponse toResponse(FeedPost post, User current) {
@@ -114,11 +210,33 @@ public class CommunityApiService {
                 post.getText(),
                 TimeLabels.feedTime(post.getCreatedAt()),
                 feedLikeRepository.countByPost_Id(post.getId()),
-                0,
+                (int) feedCommentRepository.countByPost_Id(post.getId()),
                 liked,
                 post.getImageUri(),
                 post.getMissionName(),
                 post.getXp()
+        );
+    }
+
+    private FeedPost postInGarden(User current, Long postId) {
+        FeedPost post = feedPostRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Publicação não encontrada"));
+        Garden garden = gardenService.findMine(current)
+                .orElseThrow(() -> new ValidationException("Entre em um jardim para ver essa publicação"));
+        if (post.getGarden() == null || !post.getGarden().getId().equals(garden.getId())) {
+            throw new ValidationException("Essa publicação não é do seu jardim");
+        }
+        return post;
+    }
+
+    private FeedCommentResponse toComment(FeedComment comment) {
+        User author = comment.getAuthor();
+        return new FeedCommentResponse(
+                comment.getId(),
+                author.getName(),
+                initial(author.getName()),
+                comment.getText(),
+                TimeLabels.feedTime(comment.getCreatedAt())
         );
     }
 

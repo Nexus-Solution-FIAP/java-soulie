@@ -2,6 +2,7 @@ package br.com.fiap.soulie.domain.achievement;
 
 import br.com.fiap.soulie.api.TimeLabels;
 import br.com.fiap.soulie.api.dto.AchievementResponse;
+import br.com.fiap.soulie.domain.garden.GardenService;
 import br.com.fiap.soulie.domain.avatar.Avatar;
 import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.mission.UserMissionCompletionRepository;
@@ -29,6 +30,9 @@ public class AchievementApiService {
 
     @Autowired
     private UserRepository userRepository;
+
+    @Autowired
+    private GardenService gardenService;
 
     @Autowired
     private AvatarRepository avatarRepository;
@@ -103,7 +107,7 @@ public class AchievementApiService {
 
     /** 1º lugar só conta quando existe disputa. Sozinho no jardim, o progresso fica em zero. */
     private int gardenRank(User user) {
-        var users = userRepository.findAllByActiveTrueOrderByPointsDescIdAsc();
+        var users = gardenService.members(user);
         if (users.size() < 2) {
             return 0;
         }
