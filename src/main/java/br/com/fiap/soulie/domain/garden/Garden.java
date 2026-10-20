@@ -23,10 +23,6 @@ public class Garden {
     @Column(name = "invite_code", nullable = false, unique = true, length = 12)
     private String inviteCode;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id")
-//    private User user;
-
     @ManyToMany
     @JoinTable(
             name = "gardens_users",

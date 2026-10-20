@@ -18,6 +18,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@AllArgsConstructor
+@NoArgsConstructor
 @Getter
 @Setter
 @EqualsAndHashCode(of = "id")
@@ -73,8 +75,6 @@ public class User implements UserDetails {
     @ManyToMany(mappedBy = "users")
     private Set<Garden> gardens = new HashSet<>();
 
-    public User() {
-    }
 
     public void updateData(@Valid UpdateUserData updateUserData) {
         if(updateUserData.name() != null ){
