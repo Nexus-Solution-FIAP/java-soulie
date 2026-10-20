@@ -10,6 +10,7 @@ public record DailyMissionResponse(
         @Schema(example = "Troque o carro pela bike em um trajeto de hoje.") String desc,
         @Schema(example = "40") int xp,
         @Schema(example = "false") boolean done,
-        @Schema(example = "2026-10-19T17:20:00") String completedAt
+        @Schema(example = "2026-10-19T17:20:00") String completedAt,
+        @Schema(example = "daily") String period
 ) {
 }

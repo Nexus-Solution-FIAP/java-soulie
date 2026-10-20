@@ -20,6 +20,7 @@ import br.com.fiap.soulie.domain.mission.UserMissionCompletionRepository;
 import br.com.fiap.soulie.domain.soulie.SoulieLevel;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
+import br.com.fiap.soulie.infra.push.ExpoPushService;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +67,9 @@ public class CommunityApiService {
     @Autowired
     private UserMissionCompletionRepository completionRepository;
 
+    @Autowired
+    private ExpoPushService expoPushService;
+
     @Transactional(readOnly = true)
     public List<RankingItemResponse> ranking(User current) {
         List<User> users = gardenService.members(current);
@@ -80,8 +84,8 @@ public class CommunityApiService {
             items.add(new RankingItemResponse(
                     position++,
                     user.getId(),
-                    user.getName(),
-                    initial(user.getName()),
+                    user.publicName(),
+                    initial(user.publicName()),
                     user.getPoints(),
                     user.currentStreak(java.time.LocalDate.now()),
                     user.getId().equals(current.getId()),
@@ -167,6 +171,9 @@ public class CommunityApiService {
         }
         User target = userRepository.findById(targetId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+        if (!target.allowsNudges()) {
+            throw new ValidationException("Essa pessoa não está recebendo cutucadas");
+        }
         long used = interactionRepository.countBySender_IdAndReceiver_IdAndKindAndCreatedAtGreaterThanEqual(
                 current.getId(),
                 targetId,
@@ -178,7 +185,16 @@ public class CommunityApiService {
         }
         interactionRepository.save(Interaction.nudge(current, target));
         if (target.getNotificationsEnabled() == null || target.getNotificationsEnabled()) {
-            notificationRepository.save(UserNotification.nudge(target, current.getName()));
+            UserNotification note = notificationRepository.save(UserNotification.nudge(target, current.getName()));
+            ExpoPushService.Result push = expoPushService.send(
+                    target.getExpoPushToken(),
+                    note.getTitle(),
+                    note.getBody(),
+                    note.getId()
+            );
+            if (push == ExpoPushService.Result.UNREGISTERED) {
+                target.setExpoPushToken(null);
+            }
         }
         return new NudgeResponse((int) (NUDGES_PER_FRIEND_PER_DAY - used - 1));
     }
@@ -210,8 +226,8 @@ public class CommunityApiService {
         boolean liked = feedLikeRepository.findByPost_IdAndUser_Id(post.getId(), current.getId()).isPresent();
         return new FeedPostResponse(
                 post.getId(),
-                author.getName(),
-                initial(author.getName()),
+                author.publicName(),
+                initial(author.publicName()),
                 COLORS[(int) Math.floorMod(author.getId(), COLORS.length)],
                 post.getText(),
                 TimeLabels.feedTime(post.getCreatedAt()),
@@ -277,8 +293,8 @@ public class CommunityApiService {
         User author = comment.getAuthor();
         return new FeedCommentResponse(
                 comment.getId(),
-                author.getName(),
-                initial(author.getName()),
+                author.publicName(),
+                initial(author.publicName()),
                 comment.getText(),
                 TimeLabels.feedTime(comment.getCreatedAt())
         );

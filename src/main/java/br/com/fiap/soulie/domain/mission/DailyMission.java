@@ -1,6 +1,7 @@
 package br.com.fiap.soulie.domain.mission;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 
 @Getter
@@ -33,6 +34,15 @@ public class DailyMission {
     @Column(name = "water_saved_liters", nullable = false)
     private double waterSavedLiters;
 
+    @Getter(AccessLevel.NONE)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 16)
+    private MissionPeriod period = MissionPeriod.DAILY;
+
     public DailyMission() {
+    }
+
+    public MissionPeriod getPeriod() {
+        return period == null ? MissionPeriod.DAILY : period;
     }
 }

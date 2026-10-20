@@ -47,12 +47,16 @@ public class MissionApiService {
 
     @Transactional(readOnly = true)
     public List<DailyMissionResponse> daily(User user) {
+        return list(user);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DailyMissionResponse> list(User user) {
         LocalDate today = LocalDate.now();
-        List<Long> doneToday = completionRepository.findByUser_IdAndCompletedOn(user.getId(), today).stream()
-                .map(completion -> completion.getMission().getId())
-                .toList();
+        List<UserMissionCompletion> completions = completionRepository
+                .findByUser_IdAndCompletedOnGreaterThanEqual(user.getId(), MissionPeriodWindow.start(MissionPeriod.YEARLY, today));
         return dailyMissionRepository.findAllByOrderByIdAsc().stream()
-                .map(mission -> toResponse(mission, doneToday.contains(mission.getId()), today, user.getId()))
+                .map(mission -> toResponse(mission, completions, today))
                 .toList();
     }
 
@@ -60,8 +64,8 @@ public class MissionApiService {
     public MissionValidationResponse validate(User user, Long missionId, MultipartFile photo) {
         DailyMission mission = dailyMissionRepository.findById(missionId)
                 .orElseThrow(() -> new EntityNotFoundException("Missão não encontrada"));
-        if (alreadyDoneToday(user.getId(), mission.getId())) {
-            throw new ValidationException("Missão já concluída hoje");
+        if (alreadyDoneInPeriod(user.getId(), mission)) {
+            throw new ValidationException(MissionPeriodWindow.alreadyDoneMessage(mission.getPeriod()));
         }
         String imageName = photo == null || photo.isEmpty() ? null : photo.getOriginalFilename();
         Reward reward = reward(user, mission, imageName, mission.getEmoji(), mission.getName() + " realizada");
@@ -80,7 +84,7 @@ public class MissionApiService {
         if (mission.isEmpty()) {
             return ActivityCompletion.none();
         }
-        if (alreadyDoneToday(user.getId(), mission.get().getId())) {
+        if (alreadyDoneInPeriod(user.getId(), mission.get())) {
             return ActivityCompletion.alreadyDone();
         }
         return ActivityCompletion.completed(reward(user, mission.get(), null, emoji, label).activity());
@@ -107,12 +111,15 @@ public class MissionApiService {
 
     private MissionValidationResponse validationResponse(User user, DailyMission mission, List<Achievement> unlocked) {
         LocalDate today = LocalDate.now();
-        List<Long> doneToday = completionRepository.findByUser_IdAndCompletedOn(user.getId(), today).stream()
-                .map(completion -> completion.getMission().getId())
-                .toList();
+        List<UserMissionCompletion> completions = completionRepository
+                .findByUser_IdAndCompletedOnGreaterThanEqual(user.getId(), MissionPeriodWindow.start(MissionPeriod.YEARLY, today));
         SuggestedMissionResponse next = dailyMissionRepository.findAllByOrderByIdAsc().stream()
-                .filter(item -> !doneToday.contains(item.getId()))
+                .filter(item -> item.getPeriod() == mission.getPeriod())
+                .filter(item -> !doneInPeriod(item, completions, today))
                 .findFirst()
+                .or(() -> dailyMissionRepository.findAllByOrderByIdAsc().stream()
+                        .filter(item -> !doneInPeriod(item, completions, today))
+                        .findFirst())
                 .map(item -> new SuggestedMissionResponse(item.getId(), item.getName(), item.getTag(), item.getXp()))
                 .orElse(null);
         BadgeUnlockedResponse badge = unlocked.isEmpty() ? null : new BadgeUnlockedResponse(
@@ -132,13 +139,16 @@ public class MissionApiService {
         );
     }
 
-    private DailyMissionResponse toResponse(DailyMission mission, boolean done, LocalDate today, Long userId) {
-        String completedAt = null;
-        if (done) {
-            completedAt = completionRepository.findByUser_IdAndMission_IdAndCompletedOn(userId, mission.getId(), today)
-                    .map(completion -> completion.getCompletedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME))
-                    .orElse(null);
-        }
+    private DailyMissionResponse toResponse(DailyMission mission, List<UserMissionCompletion> completions, LocalDate today) {
+        UserMissionCompletion latest = completions.stream()
+                .filter(completion -> completion.getMission().getId().equals(mission.getId())
+                        && MissionPeriodWindow.contains(mission.getPeriod(), today, completion.getCompletedOn()))
+                .max(java.util.Comparator.comparing(UserMissionCompletion::getCompletedAt))
+                .orElse(null);
+        boolean done = latest != null;
+        String completedAt = latest == null
+                ? null
+                : latest.getCompletedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
         return new DailyMissionResponse(
                 mission.getId(),
                 mission.getEmoji(),
@@ -147,12 +157,25 @@ public class MissionApiService {
                 mission.getDescription(),
                 mission.getXp(),
                 done,
-                completedAt
+                completedAt,
+                mission.getPeriod().json()
         );
     }
 
-    private boolean alreadyDoneToday(Long userId, Long missionId) {
-        return completionRepository.findByUser_IdAndMission_IdAndCompletedOn(userId, missionId, LocalDate.now()).isPresent();
+    private boolean alreadyDoneInPeriod(Long userId, DailyMission mission) {
+        LocalDate today = LocalDate.now();
+        return completionRepository.existsByUser_IdAndMission_IdAndCompletedOnBetween(
+                userId,
+                mission.getId(),
+                MissionPeriodWindow.start(mission.getPeriod(), today),
+                MissionPeriodWindow.end(mission.getPeriod(), today)
+        );
+    }
+
+    private boolean doneInPeriod(DailyMission mission, List<UserMissionCompletion> completions, LocalDate today) {
+        return completions.stream().anyMatch(completion ->
+                completion.getMission().getId().equals(mission.getId())
+                        && MissionPeriodWindow.contains(mission.getPeriod(), today, completion.getCompletedOn()));
     }
 
     private List<String> detections(DailyMission mission) {

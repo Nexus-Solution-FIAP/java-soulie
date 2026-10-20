@@ -20,7 +20,10 @@ CREATE TABLE users
     co2_saved_kg            DOUBLE PRECISION NOT NULL DEFAULT 0,
     water_saved_liters      DOUBLE PRECISION NOT NULL DEFAULT 0,
     notifications_enabled   BOOLEAN      NOT NULL DEFAULT TRUE,
-    email_weekly_digest     BOOLEAN      NOT NULL DEFAULT FALSE
+    email_weekly_digest     BOOLEAN      NOT NULL DEFAULT FALSE,
+    expo_push_token         VARCHAR(255),
+    allow_nudges            BOOLEAN      NOT NULL DEFAULT TRUE,
+    show_full_name          BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE avatars
@@ -134,7 +137,8 @@ CREATE TABLE daily_missions
     description        VARCHAR(500) NOT NULL,
     xp                 INTEGER      NOT NULL,
     co2_saved_kg       DOUBLE PRECISION NOT NULL DEFAULT 0,
-    water_saved_liters DOUBLE PRECISION NOT NULL DEFAULT 0
+    water_saved_liters DOUBLE PRECISION NOT NULL DEFAULT 0,
+    period             VARCHAR(16)  NOT NULL DEFAULT 'DAILY'
 );
 
 CREATE TABLE user_mission_completions
@@ -234,17 +238,28 @@ CREATE TABLE feed_likes
     CONSTRAINT uq_feed_like UNIQUE (post_id, user_id)
 );
 
-INSERT INTO daily_missions (emoji, name, tag, description, xp, co2_saved_kg, water_saved_liters)
-VALUES ('♻️', 'Reciclar Resíduos', 'Reciclagem', 'Separe lixo reciclável corretamente', 30, 0.35, 0),
-       ('🚌', 'Transporte Público', 'Mobilidade', 'Use ônibus, metrô ou bicicleta', 40, 1.60, 0),
-       ('💧', 'Economia de Água', 'Água', 'Banho menor que 5 minutos', 25, 0.12, 60),
-       ('🛍️', 'Compra Consciente', 'Consumo', 'Evite embalagem plástica desnecessária', 20, 0.25, 0),
-       ('⚡', 'Energia Limpa', 'Energia', 'Desligue aparelhos em standby', 15, 0.12, 0),
-       ('🌱', 'Compostagem', 'Resíduos', 'Faça compostagem do lixo orgânico', 45, 0.50, 0),
-       ('🥦', 'Refeição Sem Carne', 'Alimentação', 'Tenha pelo menos uma refeição vegetariana', 30, 1.50, 0),
-       ('💡', 'Luz Natural', 'Energia', 'Aproveite a luz do sol e apague as luzes', 20, 0.04, 0),
-       ('🌻', 'Plantar uma Muda', 'Natureza', 'Plante uma muda ou cultive uma horta', 50, 2.00, 0),
-       ('🥤', 'Zero Descartáveis', 'Consumo', 'Use copo ou garrafa reutilizável hoje', 25, 0.15, 0);
+INSERT INTO daily_missions (emoji, name, tag, description, xp, co2_saved_kg, water_saved_liters, period)
+VALUES ('♻️', 'Reciclar Resíduos', 'Reciclagem', 'Separe lixo reciclável corretamente', 30, 0.35, 0, 'DAILY'),
+       ('🚌', 'Transporte Público', 'Mobilidade', 'Use ônibus, metrô ou bicicleta', 40, 1.60, 0, 'DAILY'),
+       ('💧', 'Economia de Água', 'Água', 'Banho menor que 5 minutos', 25, 0.12, 60, 'DAILY'),
+       ('🛍️', 'Compra Consciente', 'Consumo', 'Evite embalagem plástica desnecessária', 20, 0.25, 0, 'DAILY'),
+       ('⚡', 'Energia Limpa', 'Energia', 'Desligue aparelhos em standby', 15, 0.12, 0, 'DAILY'),
+       ('🌱', 'Compostagem', 'Resíduos', 'Faça compostagem do lixo orgânico', 45, 0.50, 0, 'DAILY'),
+       ('🥦', 'Refeição Sem Carne', 'Alimentação', 'Tenha pelo menos uma refeição vegetariana', 30, 1.50, 0, 'DAILY'),
+       ('💡', 'Luz Natural', 'Energia', 'Aproveite a luz do sol e apague as luzes', 20, 0.04, 0, 'DAILY'),
+       ('🌻', 'Plantar uma Muda', 'Natureza', 'Plante uma muda ou cultive uma horta', 50, 2.00, 0, 'DAILY'),
+       ('🥤', 'Zero Descartáveis', 'Consumo', 'Use copo ou garrafa reutilizável hoje', 25, 0.15, 0, 'DAILY'),
+       ('♻️', 'Reciclagem da Semana', 'Reciclagem', 'Separe o reciclável em pelo menos 3 dias desta semana', 80, 1.05, 0, 'WEEKLY'),
+       ('🚲', 'Semana Sem Carro', 'Mobilidade', 'Faça 3 deslocamentos só de bike, a pé ou transporte público', 100, 4.80, 0, 'WEEKLY'),
+       ('💧', 'Meta Semanal de Água', 'Água', 'Tome 3 banhos de até 5 minutos nesta semana', 70, 0.36, 180, 'WEEKLY'),
+       ('🥦', 'Semana Leve', 'Alimentação', 'Faça 3 refeições sem carne nesta semana', 90, 4.50, 0, 'WEEKLY'),
+       ('🌻', 'Horta do Mês', 'Natureza', 'Plante ou cuide de uma horta ou muda neste mês', 150, 2.00, 0, 'MONTHLY'),
+       ('🛍️', 'Mês Zero Plástico', 'Consumo', 'Passe um dia inteiro sem descartáveis e registre', 120, 0.45, 0, 'MONTHLY'),
+       ('⚡', 'Auditoria de Energia', 'Energia', 'Revise e desligue aparelhos em standby da casa', 100, 0.50, 0, 'MONTHLY'),
+       ('🗑️', 'Limpeza Comunitária', 'Resíduos', 'Recolha resíduos em um espaço público ou condomínio', 180, 1.50, 0, 'MONTHLY'),
+       ('🌳', 'Árvore do Ano', 'Natureza', 'Plante uma árvore ou adote uma muda permanente', 400, 8.00, 0, 'YEARLY'),
+       ('🌍', 'Mutirão Anual', 'Resíduos', 'Participe de uma ação coletiva de coleta ou reciclagem', 300, 3.00, 0, 'YEARLY'),
+       ('🏡', 'Hábito Sustentável', 'Consumo', 'Substitua um item descartável da rotina por um reutilizável', 250, 1.20, 0, 'YEARLY');
 
 INSERT INTO achievements (name, description, icon, color, category, xp_reward, target, metric, metric_key)
 VALUES ('Reciclador Consciente', 'Realizou 10 reciclagens registradas no app', 'recycle', '#10B981', 'Sustentabilidade', 50, 10, 'MISSION_TAG', 'Reciclagem'),

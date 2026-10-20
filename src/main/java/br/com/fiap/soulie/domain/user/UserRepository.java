@@ -16,4 +16,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByHandle(String handle);
 
     User findByEmail(String email);
+
+    List<User> findAllByExpoPushToken(String expoPushToken);
 }

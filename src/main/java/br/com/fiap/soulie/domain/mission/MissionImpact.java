@@ -41,6 +41,17 @@ public final class MissionImpact {
             case "Luz Natural" -> new Factors(0, 0.04, 0);
             case "Plantar uma Muda" -> new Factors(0, 2.00, 0);
             case "Zero Descartáveis" -> new Factors(0, 0.15, 0);
+            case "Reciclagem da Semana" -> new Factors(0.90, 1.05, 0);
+            case "Semana Sem Carro" -> new Factors(0, 4.80, 0);
+            case "Meta Semanal de Água" -> new Factors(0, 0.36, 180);
+            case "Semana Leve" -> new Factors(0, 4.50, 0);
+            case "Horta do Mês" -> new Factors(0, 2.00, 0);
+            case "Mês Zero Plástico" -> new Factors(0, 0.45, 0);
+            case "Auditoria de Energia" -> new Factors(0, 0.50, 0);
+            case "Limpeza Comunitária" -> new Factors(1.00, 1.50, 0);
+            case "Árvore do Ano" -> new Factors(0, 8.00, 0);
+            case "Mutirão Anual" -> new Factors(2.00, 3.00, 0);
+            case "Hábito Sustentável" -> new Factors(0, 1.20, 0);
             default -> new Factors(0, 0, 0);
         };
     }

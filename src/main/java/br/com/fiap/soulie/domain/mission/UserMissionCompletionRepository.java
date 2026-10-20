@@ -13,7 +13,11 @@ public interface UserMissionCompletionRepository extends JpaRepository<UserMissi
 
     Optional<UserMissionCompletion> findByUser_IdAndMission_IdAndCompletedOn(Long userId, Long missionId, LocalDate completedOn);
 
+    boolean existsByUser_IdAndMission_IdAndCompletedOnBetween(Long userId, Long missionId, LocalDate start, LocalDate end);
+
     List<UserMissionCompletion> findByUser_IdAndCompletedOn(Long userId, LocalDate completedOn);
+
+    List<UserMissionCompletion> findByUser_IdAndCompletedOnGreaterThanEqual(Long userId, LocalDate start);
 
     long countByUser_IdAndMission_Tag(Long userId, String tag);
 

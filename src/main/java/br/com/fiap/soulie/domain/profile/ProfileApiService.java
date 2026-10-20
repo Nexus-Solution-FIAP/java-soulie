@@ -2,15 +2,18 @@ package br.com.fiap.soulie.domain.profile;
 
 import br.com.fiap.soulie.api.TimeLabels;
 import br.com.fiap.soulie.api.dto.UpdateSettingsRequest;
+import br.com.fiap.soulie.api.dto.UserDataExportResponse;
 import br.com.fiap.soulie.api.dto.UserProfileResponse;
 import br.com.fiap.soulie.api.dto.UserSettingsResponse;
 import br.com.fiap.soulie.api.dto.UserStatsResponse;
 import br.com.fiap.soulie.domain.achievement.AchievementApiService;
 import br.com.fiap.soulie.domain.achievement.UserAchievementRepository;
+import br.com.fiap.soulie.domain.activity.ActivityApiService;
 import br.com.fiap.soulie.domain.garden.GardenService;
 import br.com.fiap.soulie.domain.soulie.SoulieApiService;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
+import jakarta.validation.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,9 @@ public class ProfileApiService {
     @Autowired
     private AchievementApiService achievementApiService;
 
+    @Autowired
+    private ActivityApiService activityApiService;
+
     @Transactional
     public UserProfileResponse me(User user) {
         var avatar = soulieApiService.getOrCreate(user);
@@ -45,9 +51,48 @@ public class ProfileApiService {
     @Transactional
     public UserProfileResponse updateSettings(User user, UpdateSettingsRequest request) {
         if (request != null) {
-            user.updateSettings(request.notificationsEnabled(), request.emailWeeklyDigest());
+            user.updateSettings(
+                    request.notificationsEnabled(),
+                    request.emailWeeklyDigest(),
+                    request.allowNudges(),
+                    request.showFullName()
+            );
         }
         return me(user);
+    }
+
+    @Transactional
+    public UserDataExportResponse exportData(User user) {
+        var avatar = soulieApiService.getOrCreate(user);
+        return new UserDataExportResponse(
+                build(user),
+                activityApiService.list(user),
+                achievementApiService.list(user, avatar)
+        );
+    }
+
+    @Transactional
+    public void deleteAccount(User user) {
+        if (gardenService.findMine(user).isPresent()) {
+            gardenService.leave(user);
+        }
+        user.deleteUser();
+    }
+
+    @Transactional
+    public void registerPushToken(User user, String token) {
+        if (token == null || token.isBlank()) {
+            user.setExpoPushToken(null);
+            return;
+        }
+        String trimmed = token.trim();
+        if (!trimmed.startsWith("ExponentPushToken[") && !trimmed.startsWith("ExpoPushToken[")) {
+            throw new ValidationException("Token de notificação inválido");
+        }
+        userRepository.findAllByExpoPushToken(trimmed).stream()
+                .filter(other -> !other.getId().equals(user.getId()))
+                .forEach(other -> other.setExpoPushToken(null));
+        user.setExpoPushToken(trimmed);
     }
 
     private UserProfileResponse build(User user) {
@@ -56,6 +101,8 @@ public class ProfileApiService {
         int unlocked = (int) userAchievementRepository.countByUser_IdAndUnlockedTrue(user.getId());
         boolean notifications = user.getNotificationsEnabled() == null || user.getNotificationsEnabled();
         boolean digest = Boolean.TRUE.equals(user.getEmailWeeklyDigest());
+        boolean nudges = user.allowsNudges();
+        boolean fullName = user.getShowFullName() == null || user.getShowFullName();
         return new UserProfileResponse(
                 user.getId(),
                 user.getName(),
@@ -73,7 +120,7 @@ public class ProfileApiService {
                         user.getCo2SavedKg(),
                         user.getWaterSavedLiters()
                 ),
-                new UserSettingsResponse(notifications, digest)
+                new UserSettingsResponse(notifications, digest, nudges, fullName)
         );
     }
 

@@ -22,6 +22,9 @@ public interface UserMapper {
     @Mapping(target = "waterSavedLiters", constant = "0")
     @Mapping(target = "notificationsEnabled", constant = "true")
     @Mapping(target = "emailWeeklyDigest", constant = "false")
+    @Mapping(target = "expoPushToken", ignore = true)
+    @Mapping(target = "allowNudges", constant = "true")
+    @Mapping(target = "showFullName", constant = "true")
     @Mapping(target = "gardens", ignore = true)
     User toEntity(UserRequest userRequest);
 }

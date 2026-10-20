@@ -20,20 +20,26 @@ import java.util.List;
 @RestController
 @RequestMapping({"/api/v1/missions", "/v1/missions"})
 @SecurityRequirement(name = "bearer-key")
-@Tag(name = "Missões", description = "Missões do dia e validação com foto")
+@Tag(name = "Missões", description = "Missões diárias, semanais, mensais e anuais")
 public class MissionApiController {
 
     @Autowired
     private MissionApiService missionApiService;
 
+    @GetMapping
+    @Operation(summary = "Missões do período", description = "Lista diárias, semanais, mensais e anuais. O campo period diz a frequência; done vale só na janela atual (hoje, semana, mês ou ano).")
+    public ResponseEntity<List<DailyMissionResponse>> list(@Parameter(hidden = true) @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(missionApiService.list(user));
+    }
+
     @GetMapping("/daily")
-    @Operation(summary = "Missões de hoje", description = "Lista as missões e marca as que o usuário já concluiu nesta data.")
+    @Operation(summary = "Missões (alias)", description = "Mesmo conteúdo de GET /missions, incluindo todos os períodos.")
     public ResponseEntity<List<DailyMissionResponse>> daily(@Parameter(hidden = true) @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(missionApiService.daily(user));
+        return ResponseEntity.ok(missionApiService.list(user));
     }
 
     @PostMapping(value = "/{id}/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Conclui a missão com foto", description = "A foto é opcional. A primeira conclusão do dia soma 1 na sequência e devolve o XP da missão. Repetir a mesma missão no mesmo dia não soma de novo.")
+    @Operation(summary = "Conclui a missão com foto", description = "A foto é opcional. A primeira conclusão do dia soma 1 na sequência e devolve o XP da missão. Diárias só uma vez por dia; semanais, mensais e anuais só uma vez no período.")
     public ResponseEntity<MissionValidationResponse> validate(@Parameter(hidden = true) @AuthenticationPrincipal User user,
                                                               @Parameter(description = "Id da missão do dia", example = "2") @PathVariable Long id,
                                                               @Parameter(description = "Foto da ação. Pode ir vazio.") @RequestPart(value = "photo", required = false) MultipartFile photo) {

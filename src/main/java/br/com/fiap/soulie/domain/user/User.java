@@ -61,6 +61,15 @@ public class User implements UserDetails {
     @Column(name = "email_weekly_digest")
     private Boolean emailWeeklyDigest;
 
+    @Column(name = "expo_push_token")
+    private String expoPushToken;
+
+    @Column(name = "allow_nudges")
+    private Boolean allowNudges;
+
+    @Column(name = "show_full_name")
+    private Boolean showFullName;
+
     @ManyToMany(mappedBy = "users")
     private Set<Garden> gardens = new HashSet<>();
 
@@ -85,6 +94,7 @@ public class User implements UserDetails {
 
     public void deleteUser() {
         this.active = false;
+        this.expoPushToken = null;
     }
 
     public void activateUser() {
@@ -95,13 +105,31 @@ public class User implements UserDetails {
         this.handle = handle;
     }
 
-    public void updateSettings(Boolean notificationsEnabled, Boolean emailWeeklyDigest) {
+    public void updateSettings(Boolean notificationsEnabled, Boolean emailWeeklyDigest,
+                               Boolean allowNudges, Boolean showFullName) {
         if (notificationsEnabled != null) {
             this.notificationsEnabled = notificationsEnabled;
         }
         if (emailWeeklyDigest != null) {
             this.emailWeeklyDigest = emailWeeklyDigest;
         }
+        if (allowNudges != null) {
+            this.allowNudges = allowNudges;
+        }
+        if (showFullName != null) {
+            this.showFullName = showFullName;
+        }
+    }
+
+    public boolean allowsNudges() {
+        return allowNudges == null || allowNudges;
+    }
+
+    public String publicName() {
+        if (Boolean.FALSE.equals(showFullName) && handle != null && !handle.isBlank()) {
+            return handle;
+        }
+        return name;
     }
 
     public void addPoints(int xp) {
@@ -154,6 +182,12 @@ public class User implements UserDetails {
         }
         if (emailWeeklyDigest == null) {
             emailWeeklyDigest = false;
+        }
+        if (allowNudges == null) {
+            allowNudges = true;
+        }
+        if (showFullName == null) {
+            showFullName = true;
         }
     }
 
