@@ -9,7 +9,17 @@ public enum FlowerType {
     HIBISCO("hibisco"),
     LAVANDA("lavanda"),
     MARGARIDA("margarida"),
-    ORQUIDEA("orquidea");
+    ORQUIDEA("orquidea"),
+    IPE_AMARELO("ipe_amarelo"),
+    GUAIMBE_ONDULADO("guaimbe_ondulado"),
+    MANACA_DA_SERRA("manaca_da_serra"),
+    MARANTA("maranta"),
+    PACOVA("pacova"),
+    PITANGUEIRA("pitangueira"),
+    RAINHA_DO_ABISMO("rainha_do_abismo"),
+    TREVO_ROXO("trevo_roxo"),
+    MULUNGU("mulungu"),
+    SUCUPIRA_PRETA("sucupira_preta");
 
     private final String value;
 
@@ -27,11 +37,12 @@ public enum FlowerType {
         if (raw == null || raw.isBlank()) {
             return null;
         }
+        String normalized = raw.trim().replace('-', '_').replace(' ', '_');
         for (FlowerType flower : values()) {
-            if (flower.value.equalsIgnoreCase(raw) || flower.name().equalsIgnoreCase(raw)) {
+            if (flower.value.equalsIgnoreCase(normalized) || flower.name().equalsIgnoreCase(normalized)) {
                 return flower;
             }
         }
-        throw new IllegalArgumentException("Flor inválida: " + raw);
+        throw new IllegalArgumentException("Planta inválida: " + raw);
     }
 }

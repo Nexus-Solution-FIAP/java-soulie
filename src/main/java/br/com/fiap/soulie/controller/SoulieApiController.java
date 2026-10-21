@@ -30,7 +30,7 @@ public class SoulieApiController {
     }
 
     @PatchMapping
-    @Operation(summary = "Renomeia ou troca a flor", description = "Flores: girassol, rosa, hibisco, lavanda, margarida, orquidea.")
+    @Operation(summary = "Renomeia ou troca a planta", description = "Tipos: girassol, rosa, hibisco, lavanda, margarida, orquidea, ipe_amarelo, guaimbe_ondulado, manaca_da_serra, maranta, pacova, pitangueira, rainha_do_abismo, trevo_roxo, mulungu, sucupira_preta.")
     public ResponseEntity<SoulieResponse> update(@Parameter(hidden = true) @AuthenticationPrincipal User user,
                                                  @RequestBody UpdateSoulieRequest request) {
         return ResponseEntity.ok(soulieApiService.update(user, request));
