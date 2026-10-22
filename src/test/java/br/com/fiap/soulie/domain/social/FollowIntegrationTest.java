@@ -70,7 +70,7 @@ class FollowIntegrationTest {
                     .forEach(s -> assertThat(s.name()).isNotBlank());
             followService.seguindo(ana, PageRequest.of(0, 20)).getContent()
                     .forEach(s -> assertThat(s.name()).isNotBlank());
-            followService.amigos(ana).forEach(s -> assertThat(s.name()).isNotBlank());
+            followService.amigos(ana, PageRequest.of(0, 20)).forEach(s -> assertThat(s.name()).isNotBlank());
         }).doesNotThrowAnyException();
     }
 
@@ -84,20 +84,20 @@ class FollowIntegrationTest {
         var primeiro = followService.seguir(ana, bia.getId());
         assertThat(primeiro.following()).isTrue();
         assertThat(primeiro.friendsNow()).isFalse();
-        assertThat(followService.amigos(ana)).isEmpty();
-        assertThat(followService.amigos(bia)).isEmpty();
+        assertThat(followService.amigos(ana, PageRequest.of(0, 20))).isEmpty();
+        assertThat(followService.amigos(bia, PageRequest.of(0, 20))).isEmpty();
 
         // B segue A de volta: agora são amigos, nos dois sentidos.
         var segundo = followService.seguir(bia, ana.getId());
         assertThat(segundo.friendsNow()).isTrue();
-        assertThat(followService.amigos(ana)).extracting("id").containsExactly(bia.getId());
-        assertThat(followService.amigos(bia)).extracting("id").containsExactly(ana.getId());
+        assertThat(followService.amigos(ana, PageRequest.of(0, 20)).getContent()).extracting("id").containsExactly(bia.getId());
+        assertThat(followService.amigos(bia, PageRequest.of(0, 20)).getContent()).extracting("id").containsExactly(ana.getId());
 
         // A deixa de seguir: a amizade se desfaz por consequência, porque ela é
         // derivada e não armazenada.
         followService.deixarDeSeguir(ana, bia.getId());
-        assertThat(followService.amigos(ana)).isEmpty();
-        assertThat(followService.amigos(bia)).isEmpty();
+        assertThat(followService.amigos(ana, PageRequest.of(0, 20))).isEmpty();
+        assertThat(followService.amigos(bia, PageRequest.of(0, 20))).isEmpty();
         // Mas B continua seguindo A.
         assertThat(followService.seguindo(bia, PageRequest.of(0, 20))).hasSize(1);
     }

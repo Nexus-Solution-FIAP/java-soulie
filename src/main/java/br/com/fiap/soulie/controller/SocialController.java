@@ -16,7 +16,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 /**
  * Seguir pessoas e ver quem sao seus amigos.
@@ -70,9 +69,14 @@ public class SocialController {
     @GetMapping("/friends")
     @Operation(summary = "Meus amigos",
             description = "Quem voce segue e te segue de volta. Sao essas pessoas que voce pode cutucar mesmo sem dividir o jardim.")
-    public ResponseEntity<List<SocialUserResponse>> amigos(
-            @Parameter(hidden = true) @AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(followService.amigos(user));
+    public ResponseEntity<Page<SocialUserResponse>> amigos(
+            @Parameter(hidden = true) @AuthenticationPrincipal User user,
+            // Paginado como as outras listas. Sem teto, a rota hidratava o User
+            // inteiro de cada amigo (hash de senha incluso) na memoria do
+            // processo, e um atacante inflava a propria lista para encarecer
+            // cada requisicao.
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(followService.amigos(user, pageable));
     }
 
     @GetMapping("/users")

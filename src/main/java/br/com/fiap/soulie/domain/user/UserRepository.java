@@ -26,8 +26,16 @@ public interface UserRepository extends JpaRepository<User, Long> {
     /** Busca por handle exato, usada pelo grafo social. Só contas ativas. */
     Optional<User> findByHandleAndActiveTrue(String handle);
 
-    /** Usada pelos validators de interação vindos do soulie-soul-up. */
     boolean existsByIdAndActiveTrue(Long id);
+
+    /**
+     * Busca que recusa conta desativada.
+     *
+     * <p>Existe porque o {@code nudge} usava {@code findById} puro: o caminho do
+     * jardim testava conta ativa, o caminho da amizade não, e a cutucada
+     * atravessava conta excluída.
+     */
+    Optional<User> findByIdAndActiveTrue(Long id);
 
     List<User> findAllByExpoPushToken(String expoPushToken);
 

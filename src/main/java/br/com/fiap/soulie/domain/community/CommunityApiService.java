@@ -181,7 +181,9 @@ public class CommunityApiService {
             throw new ValidationException(
                     "Vocês precisam dividir o jardim ou seguir um ao outro para cutucar");
         }
-        User target = userRepository.findById(targetId)
+        // findByIdAndActiveTrue, nao findById: o caminho da amizade nao testava
+        // conta ativa, entao cutucada atravessava conta excluida.
+        User target = userRepository.findByIdAndActiveTrue(targetId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
         if (!target.allowsNudges()) {
             throw new ValidationException("Essa pessoa não está recebendo cutucadas");
@@ -197,7 +199,7 @@ public class CommunityApiService {
         }
         interactionRepository.save(Interaction.nudge(current, target));
         if (target.getNotificationsEnabled() == null || target.getNotificationsEnabled()) {
-            UserNotification note = notificationRepository.save(UserNotification.nudge(target, current.getName()));
+            UserNotification note = notificationRepository.save(UserNotification.nudge(target, current.publicName()));
             ExpoPushService.Result push = expoPushService.send(
                     target.getExpoPushToken(),
                     note.getTitle(),

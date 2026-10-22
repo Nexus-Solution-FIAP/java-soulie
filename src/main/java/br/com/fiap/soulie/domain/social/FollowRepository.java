@@ -38,13 +38,32 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
     /**
      * Os dois se seguem?
      *
-     * <p>É a consulta quente do grafo — ranking, feed e cutucada passam por ela
-     * — e é o que define "amizade" neste projeto, já que amizade não tem tabela.
+     * <p>É a consulta quente do grafo e é o que <b>define</b> amizade neste
+     * projeto, já que amizade não tem tabela. Duas correções importantes:
+     *
+     * <ul>
+     *   <li><b>Filtra conta ativa.</b> O caminho do jardim na cutucada já
+     *       testava isso; este não testava nada. Amigo que desativava a conta
+     *       continuava recebendo cutucada e gravando linha em
+     *       {@code interactions} e {@code user_notifications}, em silêncio —
+     *       porque o push não sai para token nulo. Sumia do {@code GET /friends}
+     *       e continuava alcançável pelo id.</li>
+     *   <li><b>Dois {@code exists} em vez de {@code count = 2}.</b> O count
+     *       estava correto hoje, mas falhava <b>aberta</b>: se o
+     *       {@code UNIQUE (follower_id, followee_id)} sumisse, duas linhas no
+     *       mesmo sentido dariam 2 e o método diria "são amigos". A invariante
+     *       de autorização não deve morar num arquivo .sql.</li>
+     * </ul>
      */
     @Query("""
-            select count(f) = 2 from Follow f
-             where (f.follower.id = :umId and f.followee.id = :outroId)
-                or (f.follower.id = :outroId and f.followee.id = :umId)
+            select (exists (select 1 from Follow ida
+                             where ida.follower.id = :umId
+                               and ida.followee.id = :outroId
+                               and ida.follower.active = true
+                               and ida.followee.active = true)
+                and exists (select 1 from Follow volta
+                             where volta.follower.id = :outroId
+                               and volta.followee.id = :umId))
             """)
     boolean saoAmigos(@Param("umId") Long umId, @Param("outroId") Long outroId);
 
@@ -62,9 +81,8 @@ public interface FollowRepository extends JpaRepository<Follow, Long> {
                and exists (select 1 from Follow volta
                             where volta.follower.id = f.followee.id
                               and volta.followee.id = :userId)
-             order by f.followee.name asc
             """)
-    List<User> amigosDe(@Param("userId") Long userId);
+    Page<User> amigosDe(@Param("userId") Long userId, Pageable pageable);
 
     /** Só os ids, para quando a consulta seguinte filtra por eles. */
     @Query("""
