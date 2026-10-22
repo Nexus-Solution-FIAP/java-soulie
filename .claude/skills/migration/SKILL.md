@@ -49,7 +49,7 @@ Convenções do projeto: `fk_<tabela>_<coluna>`, `uq_<tabela>_<colunas>`, `check
 
 1. A **entidade JPA** precisa refletir a coluna: `@Column(name = "...")`, e enum **sempre** com `@Enumerated(EnumType.STRING)`.
 2. Se o campo é obrigatório, confira se os **helpers de teste** (`RepositoryTestBase`, `TestData`) precisam preenchê-lo — senão os testes quebram com violação de `NOT NULL`.
-3. `src/main/resources/db/soulie-schema.sql` é um dump de referência do schema completo. Atualize-o, ou deixe claro que ficou velho.
+3. Não existe dump do schema para manter. O `db/soulie-schema.sql` foi removido na Fase 2: ele prometia "schema final" e estava 8 migrations atrasado, então quem o executasse ganhava um banco quebrado. O schema é o que as migrations produzem, e nada mais.
 
 ## Passo 4 — verifique
 
