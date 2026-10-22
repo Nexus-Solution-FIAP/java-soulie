@@ -10,6 +10,8 @@ import java.util.Set;
 @Getter
 @Setter
 @EqualsAndHashCode(of = "id")
+@Builder
+@AllArgsConstructor
 @Entity(name = "Garden")
 @Table(name = "gardens")
 public class Garden {
@@ -23,6 +25,7 @@ public class Garden {
     @Column(name = "invite_code", nullable = false, unique = true, length = 12)
     private String inviteCode;
 
+    @Builder.Default
     @ManyToMany
     @JoinTable(
             name = "gardens_users",
