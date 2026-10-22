@@ -1,0 +1,25 @@
+# Perfil de desenvolvimento. Ativo por padrão (spring.profiles.default: dev).
+#
+# As variáveis DB_* e SECRET_JWT continuam obrigatórias — veja .env.example.
+# Nenhuma delas tem valor padrão de propósito: é melhor falhar no boot que
+# subir apontando para um banco errado ou com um segredo previsível.
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    # Em desenvolvimento, falhar cedo se uma migration já aplicada foi editada.
+    validate-on-migrate: true
+
+logging:
+  level:
+    br.com.fiap.soulie: DEBUG
+    org.springframework.security: INFO
+
+# Nada de `include-message: always` aqui. Essa chave vale para as respostas do
+# /error, que são justamente os caminhos que o @RestControllerAdvice NÃO cobre
+# (exceção escapando de filtro, por exemplo) — era por ali que a mensagem crua do
+# banco voltava a sair na resposta. O id de correlação do ErrorHandler já dá
+# rastreabilidade suficiente para depurar, sem expor nada.

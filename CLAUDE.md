@@ -79,7 +79,10 @@ O app mobile do parceiro de equipe consome `/v1`. **Nenhum campo pode ser removi
 - Nome: `V<n>__snake_case_descricao.sql`, `n` sem zero à esquerda.
 - **Sempre confira o maior número existente antes de criar** (`ls src/main/resources/db.migrations/`). Migration já aplicada nunca é editada.
 - Sintaxe **só PostgreSQL**. O perfil de teste não roda Flyway (gera o schema das entidades), então sintaxe exótica não quebra teste — quebra produção.
-- `src/main/resources/db/soulie-schema.sql` é um dump de referência do schema completo. **Ele desatualiza fácil** — se mexer no schema, atualize ou assuma que está velho.
+- **O schema é o que as migrations produzem, e nada mais.** Não há dump para manter em paralelo: o antigo `db/soulie-schema.sql` foi removido por estar 8 migrations atrasado prometendo ser o "schema final". Não recrie esse padrão.
+- **Sempre declare `@Column(name = ..., length = ...)` explicitamente na entidade.** Não confie na nomeação implícita nem no tamanho padrão. O schema dos testes vem das **entidades** e o de produção vem das **migrations**: se a entidade for implícita, os dois divergem e o teste passa a validar um schema que não é o de produção. Dois casos reais já aconteceram aqui:
+  - `resultValidation` sem `@Column`: em produção o Hibernate converte para `result_validation` e acerta, mas no perfil de teste o `globally_quoted_identifiers` **pula** essa conversão e gera `resultValidation`. O teste nunca exercitava o nome real da coluna.
+  - campo `String` sem `length`: o H2 gera `varchar(255)` enquanto a migration tem `varchar(100)`. Um nome de 200 caracteres **passava no teste e falhava em produção**.
 
 ## Testes
 

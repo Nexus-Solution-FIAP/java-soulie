@@ -45,10 +45,23 @@ const REGRAS = [
   {
     id: "fallback-de-segredo",
     gravidade: "ALTO",
-    // ${VAR:valorPadrao} onde a var é um segredo — fallback previsível.
-    regex:
-      /\$\{(?:SECRET|JWT|HMAC|API|AWS|S3|RABBIT|REDIS)\w*\s*:\s*([^}]+)\}/gi,
-    aceita: (m) => !VALOR_INOCENTE.test(m[1].trim()),
+    // ${VAR:valorPadrao} onde a variável é uma credencial — fallback previsível.
+    regex: /\$\{([A-Z0-9_]+)\s*:\s*([^}]*)\}/g,
+    aceita: (m) => {
+      const nome = m[1];
+      // Só credencial importa. Duração, URL, host, porta e flag têm valor
+      // padrão legitimamente.
+      const ehCredencial =
+        /(?:SECRET|PASSWORD|PASSWD|SENHA|TOKEN|CREDENTIAL|HMAC|APIKEY|API_KEY|_KEY$|^KEY_)/.test(
+          nome
+        );
+      const naoEhSegredo =
+        /(?:EXPIRATION|EXPIRES|TTL|TIMEOUT|_URL$|URI|HOST|PORT|ENABLED|MODE|REGION|BUCKET|VHOST|_NAME$|_USER$|ORIGINS|STRATEGY)/.test(
+          nome
+        );
+      if (!ehCredencial || naoEhSegredo) return false;
+      return !VALOR_INOCENTE.test(m[2].trim());
+    },
     mensagem:
       "Segredo com valor padrão embutido. Se a variável faltar em produção, a aplicação sobe com um segredo público. Deixe sem fallback e falhe o boot.",
   },
@@ -65,8 +78,21 @@ const REGRAS = [
     // Mensagem de exceção indo para o corpo da resposta.
     regex:
       /\.body\s*\(\s*[^)]*\b(?:ex|e|exception|throwable|t)\s*\.\s*get(?:Localized)?Message\s*\(/gi,
+    // Só acusa quando a exceção NÃO é nossa. Mensagem de ValidationException ou
+    // BusinessException é texto que nós escrevemos para o usuário final e pode ir
+    // na resposta; já a de Exception, RuntimeException ou erro de banco carrega
+    // SQL, nome de tabela e caminho de arquivo.
+    aceita: (m, texto) => {
+      const antes = texto.slice(0, m.index);
+      const handler = antes.lastIndexOf("@ExceptionHandler");
+      if (handler === -1) return true;
+      const tipo = texto.slice(handler, handler + 200);
+      return /@ExceptionHandler\s*\(\s*(?:\{\s*)?(?:Exception|Throwable|RuntimeException|SQL\w*|DataAccess\w*|Persistence\w*|Hibernate\w*)\s*\.class/.test(
+        tipo
+      );
+    },
     mensagem:
-      "Mensagem de exceção no corpo da resposta vaza detalhe interno (SQL, nome de tabela, caminho). Logue completo no servidor e devolva mensagem genérica.",
+      "Mensagem de exceção genérica no corpo da resposta vaza detalhe interno (SQL, nome de tabela, caminho). Logue completo no servidor com um id de correlação e devolva mensagem genérica.",
   },
   {
     id: "rota-liberada",
@@ -149,7 +175,7 @@ function achadosEm(texto) {
     regra.regex.lastIndex = 0;
     let m;
     while ((m = regra.regex.exec(texto)) !== null) {
-      if (regra.aceita && !regra.aceita(m)) continue;
+      if (regra.aceita && !regra.aceita(m, texto)) continue;
 
       const linha = texto.slice(0, m.index).split(/\r?\n/).length;
       const conteudo = (linhas[linha - 1] || "").trim();
