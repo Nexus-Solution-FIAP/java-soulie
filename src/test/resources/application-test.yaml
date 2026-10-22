@@ -1,0 +1,43 @@
+# Perfil dos testes: H2 em memória no lugar do PostgreSQL.
+#
+# Não há Docker nesta máquina, então Testcontainers não é opção. A consequência
+# a assumir: as migrations do Flyway NÃO são exercitadas por teste. O schema aqui
+# é gerado a partir das entidades. Erro de sintaxe numa migration só aparece
+# contra um PostgreSQL de verdade — rode `flyway:migrate` num banco descartável
+# antes de publicar.
+spring:
+  datasource:
+    url: "jdbc:h2:mem:soulie;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
+    username: "sa"
+    password: ""
+    driver-class-name: "org.h2.Driver"
+  flyway:
+    # As migrations usam sintaxe exclusiva do PostgreSQL (a V20 faz
+    # ALTER COLUMN ... TYPE ... USING CASE, que o H2 não entende).
+    enabled: false
+  jpa:
+    show-sql: false
+    hibernate:
+      # O schema vem das entidades, não das migrations.
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        # Necessário: "level" (Avatar) e "date" (HistoryPoints) são palavras
+        # reservadas no H2. Sem isto o schema nem é criado.
+        globally_quoted_identifiers: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
+api:
+  security:
+    token:
+      secret_jwt: "segredo-apenas-de-teste-nao-usar-em-nenhum-ambiente-real"
+      expiration: "PT2H"
+  cors:
+    allowed-origins: "http://localhost:3000"
+
+logging:
+  level:
+    org.hibernate.SQL: WARN

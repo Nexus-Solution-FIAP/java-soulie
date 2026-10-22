@@ -7,9 +7,10 @@
 | Fase | Entrega | Status |
 |---|---|---|
 | 0 | `CLAUDE.md`, agentes, skills, hook de segurança, `.gitignore` + `.env.example` | ✅ concluída |
-| 1 | Correções de segurança 1–6, 8, 9 + perfis do Spring (`dev`/`prod`/`test`) | ⬜ não iniciada |
-| 2 | Port dos domínios do `soulie-soul-up` + `@Builder` + migrations V19/V20 | ⬜ não iniciada |
-| 3 | Port dos 50 testes + perfil H2 + `spring-boot-starter-test` e `h2` no pom | ⬜ não iniciada |
+| 1 | Correções de segurança + perfis do Spring (`dev`/`prod`/`test`) | ✅ pronta e auditada |
+| 1b | Travar rotas legadas `/user` + 13 itens da auditoria | ✅ pronta, aguardando re-auditoria |
+| 2 | Port dos domínios do `soulie-soul-up` + migrations V19/V20 | ✅ 49 arquivos, compila | 
+| 3 | Port da suíte de testes em H2 | ✅ **79 testes passando**, `./mvnw clean verify` verde |
 | 4 | Pipeline de IA: storage S3, RabbitMQ, cliente da IA, webhook HMAC, migration V21 | ⬜ não iniciada |
 | 5 | Social: follow/amizade, endpoints, migration V22 | ⬜ não iniciada |
 | 6 | Cloudflare + rate limit distribuído (Bucket4j/Redis) | ⬜ não iniciada |
@@ -17,13 +18,22 @@
 
 Legenda: ⬜ não iniciada · 🟡 em andamento · ✅ concluída e revisada pelo `security-auditor` · ⚠️ bloqueada
 
-**Baseline verificado:** `./mvnw clean compile` passa na branch `feature/integracao-soulup-ia-infra` (126 classes, exit 0). Qualquer quebra a partir daqui é nossa.
+**Branch:** `feature/integracao-soulup-ia-infra`, criada a partir de `feature/adding-soulie-app-endpoints`. A branch original está intacta.
+
+**Estado do build:** `./mvnw clean verify` → **BUILD SUCCESS, 79 testes, 0 falhas**. Antes deste trabalho havia 1 teste trivial que nem rodava sem um PostgreSQL de verdade.
 
 ### Registro de decisões e mudanças
 
 | Data | O que mudou |
 |---|---|
 | 2026-10-20 | Plano inicial escrito. Decisões do usuário registradas na seção "Decisões já tomadas". Verificado que o `bucket4j-spring-boot-starter` não suporta Boot 4.1 → usar a biblioteca core com filtro próprio. |
+| 2026-10-21 | **Fase 3 concluída: 79 testes passando.** Os 28 arquivos portados rodam em H2. Quatro expectativas precisaram mudar, todas por diferença legítima de modelo e nenhuma enfraquecendo asserção: (a) e (b) dois testes esperavam **403 sem credencial** e agora recebem **401** — isso é correção, não regressão: 403 era consequência de não existir `AuthenticationEntryPoint`, e sem credencial o correto é 401; (c) `MissionControllerTest` afirmava sobre `$.experience`, campo que o `AvatarResponse` do `java-soulie` não tem; (d) `MissionTest` esperava XP 30 e agora espera 130, porque aqui `xp` é o total acumulado e não o XP dentro do nível. |
+| 2026-10-21 | **Bug de mapeamento achado pelos testes.** O log do Hibernate mostrou `create table "validations" ("resultValidation" ...)` — camelCase. Três campos portados (`resultValidation`, `pointsEarned`, `pointsSpent`) dependiam de nomeação **implícita**: em produção o Hibernate converte para snake_case e acerta, mas no perfil de teste o `globally_quoted_identifiers` **pula** essa conversão. Resultado: o teste gerava `resultValidation` e produção usa `result_validation`, então o teste nunca exercitava o nome real da coluna. Resolvido com `@Column(name = ...)` explícito nos três. |
+| 2026-10-21 | **Fase 1b concluída.** Rotas legadas `/user` travadas no próprio usuário, e os 13 itens da auditoria corrigidos. O scanner determinístico agora reporta 164 arquivos limpos e 2 com achado — e os 2 são conhecidos e rastreados (`getOriginalFilename` resolve na Fase 4; `permitAll` sem rate limit, na Fase 6). |
+| 2026-10-21 | **Auditoria da Fase 1 encontrou 3 vulnerabilidades pré-existentes mais graves que tudo que estava no plano:** `PUT /user` gravava **senha em texto puro**; `PATCH /user/{id}` deixava qualquer usuário autenticado **reativar a conta de outro**, desfazendo a exclusão de conta pedida pelo titular; e `GET /user?size=2000` entregava o e-mail de toda a base, que é o insumo do IDOR. Também achou **dois erros meus**: o `SecurityFilter` rodando nas rotas públicas causava **lockout no login** (app com token expirado no header recebia 401 no próprio `/login` e não conseguia renovar), e eu havia escrito um comentário afirmando que o curinga de CORS "não é aceito", o que era falso — `CORS_ALLOWED_ORIGINS=*` reintroduzia o problema inteiro. E que a minha correção do `SECRET_JWT` estava pela metade: o boot falhava se a variável não existisse, mas **subia com valor vazio ou curto**. |
+| 2026-10-21 | **Fase 2: port executado.** 49 arquivos (não 55 — ver abaixo). Compila: 182 classes, antes 126. Zero colisão de rota: os 5 controllers legados entram em `/action`, `/mission`, `/evidence`, `/reward`, `/history-points`, namespaces livres. O contrato `/v1` ficou **intacto** (`api/dto`, controllers e services `/v1` não foram tocados); o único arquivo pré-existente de domínio alterado foi `User.java`, de forma puramente aditiva (`spendPoints`). Migrations **V19** (`missions.status`, que faltava e quebraria em runtime) e **V20** (`validations.result_validation` de INTEGER para VARCHAR). O enum `ResultValidation` foi corrigido de `APROVED`/`REJECT` para `APPROVED`/`REJECTED` e ganhou `FAILED`, para separar falha de infraestrutura de reprovação legítima. Removido `db/soulie-schema.sql`: estava 8 migrations atrasado prometendo ser o "schema final" — quem o executasse ganharia um banco quebrado (recuperável no git). |
+| 2026-10-21 | **Reduzido de 55 para 49 arquivos no port.** `validations/interaction/` (4 arquivos) depende do `InteractionRequest` do domínio `interaction`, que não é portado por colisão na tabela `interactions` — e pelo plano essas regras pertencem à Fase 5, junto com o grafo social. `validations/avatar/` (2 arquivos) só é usado pelo `AvatarService` do `soulie-soul-up`, que também não vem, e a regra "um avatar por usuário" já é garantida pelo `UNIQUE` em `avatars.user_id`. Portar os dois agora seria código morto. |
+| 2026-10-21 | **Hook de segurança recalibrado** depois de dar dois falsos positivos no próprio código da Fase 1: (a) mensagem de exceção na resposta agora só é acusada quando o `@ExceptionHandler` é de tipo genérico (`Exception`, `RuntimeException`, erro de banco) — a de `ValidationException` e `BusinessException` é texto nosso, escrito para o usuário; (b) fallback de segredo agora distingue credencial de configuração, então `${JWT_EXPIRATION:PT2H}` e `${S3_BUCKET:...}` não são mais acusados, mas `${SECRET_JWT:...}`, `${S3_SECRET_KEY:...}` e `${AI_WEBHOOK_SECRET:...}` continuam sendo. |
 | 2026-10-20 | **Fase 0 concluída.** Branch `feature/integracao-soulup-ia-infra` criada a partir de `feature/adding-soulie-app-endpoints`. Baseline compila. Criados `CLAUDE.md`, 3 agentes, 4 skills, hook determinístico de segurança, `.env.example`, e `.gitignore` passou a ignorar `.env`. O hook foi calibrado contra os 110 arquivos Java do projeto: **107 limpos, 3 com achado, zero falso positivo** — e os achados são exatamente os itens #3 (vazamento no `ErrorHandler`), #4 (CORS curinga) e #12 (`getOriginalFilename`) da tabela de segurança. Rodando contra o `application.yaml` ele também pega o item #5 (fallback `SenhaReserva`). |
 
 ---
@@ -136,6 +146,23 @@ As tabelas `actions`, `missions`, `evidences`, `validations`, `history_points` e
 **Não portar**: `AuthenticationController`, `UserController`, `AvatarController`, `GardenController` (colisão de rota), `domain/interaction/**` (colisão de tabela), `domain/garden/**`, `domain/user/**`, `domain/avatar/**` (as versões do `java-soulie` são estritamente mais novas), `SecurityConfigurations`, `SpringDocConfig`, `ErrorHandler` (já existem).
 
 **Aproveitar do `soulie-soul-up` sem portar o arquivo**: a lista explícita de origens de CORS (`${CORS_ALLOWED_ORIGINS}`) — o `java-soulie` hoje libera `setAllowedOriginPatterns(List.of("*"))` com todos os headers, e isso precisa ser fechado.
+
+### 1.1.1 Delta real do port (levantado, não estimado)
+
+São **55 arquivos** a portar. O port **não é mecânico**: o código do `soulie-soul-up` chama a API dos domínios compartilhados (`User`, `Avatar`, `Garden`), que no `java-soulie` evoluiu diferente. Levantei todos os 12 pontos de contato:
+
+| O que o código portado chama | Situação no `java-soulie` | Ação |
+|---|---|---|
+| `avatar.gainExperience(n)` | existe como **`addXp(n)`** | trocar a chamada |
+| `avatarRepository.existsByUserId` / `findByUserId` | já existem | — |
+| `user.addPoints`, `getId`, `getPoints` | já existem | — |
+| `userRepository.findById` / `getReferenceById` | `JpaRepository` | — |
+| `avatarMapper.toDetail(avatar)` | existe, mesma assinatura | — |
+| `gardenRepository.existsSharedGarden(a, b)` | **não existe** | adicionar a `@Query` |
+| `userRepository.existsByIdAndActiveTrue(id)` | **não existe** | adicionar query derivada |
+| `user.spendPoints(n)` | **não existe** | adicionar na entidade |
+
+Diferença de modelo a registrar: o `soulie-soul-up` guarda `Avatar.experience` (XP **dentro** do nível, com `XP_PER_LEVEL = 100` e incremento explícito de nível); o `java-soulie` guarda `Avatar.xp` (XP **total**, com o nível derivado por `SoulieLevel`). O `java-soulie` também começa o avatar no nível 0, e o `soulie-soul-up` no 1. **Vale o modelo do `java-soulie`** — é o que o app consome. Por consequência o `AvatarResponse` portado é descartado: o do `java-soulie` não tem o campo `experience`, e é ele que fica.
 
 ### 1.2 Arquivos a modificar no `java-soulie`
 
