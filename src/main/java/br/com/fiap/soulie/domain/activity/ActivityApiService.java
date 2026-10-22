@@ -43,13 +43,23 @@ public class ActivityApiService {
         if (request == null || request.label() == null || request.label().isBlank()) {
             throw new ValidationException("Descrição da atividade é obrigatória");
         }
-        var completed = missionApiService.completeFromActivity(user, request.label(), request.emoji());
-        if (completed.kind() == MissionApiService.ActivityCompletion.Kind.COMPLETED) {
-            return toResponse(completed.activity());
+        // Missão do catálogo NÃO se conclui por aqui. A versão anterior casava
+        // o texto livre com o nome da missão e entregava a recompensa cheia —
+        // XP, impacto, streak e conquistas — sem foto e sem IA. Bastava escrever
+        // "Ir de bicicleta" para contornar todo o pipeline de validação, o que
+        // tornava o pipeline decorativo.
+        //
+        // Recusar com orientação, em vez de registrar em silêncio uma atividade
+        // que não vale nada: assim o app consegue mandar a pessoa para o fluxo
+        // certo, e ela não fica achando que concluiu a missão.
+        var missaoMencionada = missionApiService.missaoMencionadaNoTexto(request.label());
+        if (missaoMencionada.isPresent()) {
+            throw new ValidationException(
+                    "Para concluir a missão \"%s\" envie a foto em /missions/%d/validate."
+                            .formatted(missaoMencionada.get().getName(), missaoMencionada.get().getId()));
         }
-        int xp = completed.kind() == MissionApiService.ActivityCompletion.Kind.ALREADY_DONE || request.xp() == null
-                ? 0
-                : request.xp();
+
+        int xp = request.xp() == null ? 0 : request.xp();
         LocalDateTime now = LocalDateTime.now();
         if (xp > 0) {
             var avatar = soulieApiService.getOrCreate(user);

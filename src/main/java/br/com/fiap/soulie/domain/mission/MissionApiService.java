@@ -95,13 +95,16 @@ public class MissionApiService {
      * {@code validationId} e {@code status}. Um cliente antigo lê
      * {@code xpGained: 0} e não estoura.
      */
-    @Transactional
     public MissionValidationResponse validate(User user, Long missionId, MultipartFile photo) {
-        DailyMission mission = dailyMissionRepository.findById(missionId)
-                .orElseThrow(() -> new EntityNotFoundException("Missão não encontrada"));
-        if (alreadyDoneInPeriod(user.getId(), mission)) {
-            throw new ValidationException(MissionPeriodWindow.alreadyDoneMessage(mission.getPeriod()));
-        }
+        // NAO e @Transactional de proposito. O upload da imagem (ate 10MB) e o
+        // round-trip com o RabbitMQ acontecem aqui dentro; segurar uma conexao
+        // do pool durante os dois esgotaria o Hikari (10 conexoes por padrao)
+        // com poucas requisicoes simultaneas de rede lenta — e aí TODO endpoint
+        // da API, login incluido, passaria a esperar por conexao.
+        //
+        // As escritas ficam em transacoes curtas, dentro do EvidenceService.
+        DailyMission mission = buscarMissaoParaValidar(user, missionId);
+
         if (photo == null || photo.isEmpty()) {
             throw new ValidationException("Envie uma foto para comprovar a missão");
         }
@@ -111,9 +114,25 @@ public class MissionApiService {
         validationPublisher.exigirFilaDisponivel();
 
         var registrada = evidenceService.submitForDailyMission(user, mission, photo);
-        var validation = registrada.validation();
 
-        return MissionValidationResponse.pendente(validation.getId(), mission.getId());
+        return MissionValidationResponse.pendente(registrada.validation().getId(), mission.getId());
+    }
+
+    /**
+     * Leitura e regras de periodo, fora da transacao do upload.
+     *
+     * <p>Sem @Transactional de proposito: chamada de dentro da propria classe
+     * nao passa pelo proxy do Spring, entao a anotacao seria decorativa. Cada
+     * consulta roda na transacao do proprio repository, e DailyMission nao tem
+     * associacao LAZY — a entidade destacada e segura de usar aqui.
+     */
+    private DailyMission buscarMissaoParaValidar(User user, Long missionId) {
+        DailyMission mission = dailyMissionRepository.findById(missionId)
+                .orElseThrow(() -> new EntityNotFoundException("Missão não encontrada"));
+        if (alreadyDoneInPeriod(user.getId(), mission)) {
+            throw new ValidationException(MissionPeriodWindow.alreadyDoneMessage(mission.getPeriod()));
+        }
+        return mission;
     }
 
     /**
@@ -133,22 +152,30 @@ public class MissionApiService {
         reward(user, mission, null, mission.getEmoji(), mission.getName() + " realizada");
     }
 
-    @Transactional
-    public ActivityCompletion completeFromActivity(User user, String label, String emoji) {
+    /**
+     * Diz se o texto de uma atividade livre casa com o nome de uma missão.
+     *
+     * <p><b>Não concede mais recompensa nenhuma.</b> A versão anterior casava
+     * texto livre com o nome da missão e chamava {@code reward(...)}, creditando
+     * XP, impacto, streak e conquistas <b>sem foto e sem IA</b> — bastava
+     * escrever "Ir de bicicleta" numa atividade para contornar todo o pipeline
+     * de validação. Enquanto essa porta existisse, o pipeline era decorativo.
+     *
+     * <p>Agora missão do catálogo só se conclui por
+     * {@code POST /v1/missions/{id}/validate}, com foto e aprovação da IA.
+     *
+     * @return a missão que o texto menciona, se houver — para o chamador poder
+     *         orientar o usuário em vez de registrar algo que não vale nada
+     */
+    @Transactional(readOnly = true)
+    public Optional<DailyMission> missaoMencionadaNoTexto(String label) {
         if (label == null || label.isBlank()) {
-            return ActivityCompletion.none();
+            return Optional.empty();
         }
         String normalized = label.toLowerCase(Locale.ROOT);
-        Optional<DailyMission> mission = dailyMissionRepository.findAllByOrderByIdAsc().stream()
+        return dailyMissionRepository.findAllByOrderByIdAsc().stream()
                 .filter(item -> normalized.contains(item.getName().toLowerCase(Locale.ROOT)))
                 .findFirst();
-        if (mission.isEmpty()) {
-            return ActivityCompletion.none();
-        }
-        if (alreadyDoneInPeriod(user.getId(), mission.get())) {
-            return ActivityCompletion.alreadyDone();
-        }
-        return ActivityCompletion.completed(reward(user, mission.get(), null, emoji, label).activity());
     }
 
     private Reward reward(User user, DailyMission mission, String imageName, String emoji, String label) {
@@ -265,8 +292,13 @@ public class MissionApiService {
         Validation validation = validationService.findById(validationId);
         var evidence = validation.getEvidence();
 
+        // 404 tambem para validacao de terceiro, nao 403. Responder diferente
+        // transformaria a rota num oraculo: daria para confirmar a existencia de
+        // um id e inferir o total e a taxa de crescimento de validacoes do
+        // sistema. Nenhum dado de terceiro vazava no corpo, mas a distincao em
+        // si ja era informacao.
         if (evidence.getUser() == null || !evidence.getUser().getId().equals(user.getId())) {
-            throw BusinessException.acessoNegado("Esta validação não é sua");
+            throw new EntityNotFoundException("Validação não encontrada");
         }
         if (evidence.getDailyMission() == null) {
             throw new EntityNotFoundException("Validação não pertence a uma missão do app");
@@ -278,19 +310,4 @@ public class MissionApiService {
     private record Reward(UserActivity activity, List<Achievement> unlocked) {
     }
 
-    public record ActivityCompletion(Kind kind, UserActivity activity) {
-        public enum Kind { NONE, ALREADY_DONE, COMPLETED }
-
-        public static ActivityCompletion none() {
-            return new ActivityCompletion(Kind.NONE, null);
-        }
-
-        public static ActivityCompletion alreadyDone() {
-            return new ActivityCompletion(Kind.ALREADY_DONE, null);
-        }
-
-        public static ActivityCompletion completed(UserActivity activity) {
-            return new ActivityCompletion(Kind.COMPLETED, activity);
-        }
-    }
 }

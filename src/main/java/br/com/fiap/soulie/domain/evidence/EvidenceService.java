@@ -93,6 +93,16 @@ public class EvidenceService {
      */
     @Transactional
     public EvidenciaRegistrada submitForDailyMission(User user, DailyMission mission, MultipartFile photo) {
+        // Uma evidência pendente por vez, por missão. Sem isto, um usuário em
+        // laço gera N uploads de 10MB e N chamadas PAGAS à IA — custo de
+        // armazenamento e de API de terceiro na conta do projeto. É o
+        // equivalente ao NoPendingEvidenceValidator do fluxo legado, que não
+        // alcança aqui porque aquela cadeia tipa Mission, não DailyMission.
+        if (evidenceRepository.existsPendingForDailyMission(user.getId(), mission.getId())) {
+            throw new ValidationException(
+                    "Você já tem uma foto desta missão em análise. Aguarde o resultado.");
+        }
+
         StoredImage imagem;
         try {
             imagem = imageStorage.store(photo, "evidencias");

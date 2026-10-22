@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Optional;
 
@@ -89,10 +91,28 @@ public class ValidationOutcomeService {
     }
 
     private void notificar(User user, String titulo, String mensagem) {
-        var notification = notificationRepository.save(
-                UserNotification.system(user, titulo, mensagem));
-        if (user.getExpoPushToken() != null && Boolean.TRUE.equals(user.getNotificationsEnabled())) {
-            expoPushService.send(user.getExpoPushToken(), titulo, mensagem, notification.getId());
+        // Trunca o texto que veio da IA antes de persistir e de exibir: a coluna
+        // do corpo da notificacao tem 500 caracteres, e e texto de terceiro.
+        String corpo = mensagem == null ? "" : mensagem.strip();
+        if (corpo.length() > 400) {
+            corpo = corpo.substring(0, 400);
         }
+        var notification = notificationRepository.save(
+                UserNotification.system(user, titulo, corpo));
+
+        if (user.getExpoPushToken() == null || !Boolean.TRUE.equals(user.getNotificationsEnabled())) {
+            return;
+        }
+        // O push sai DEPOIS do commit. Mandar aqui dentro seguraria o lock da
+        // validacao e a conexao do pool durante a chamada HTTP ao Expo.
+        var destino = user.getExpoPushToken();
+        var corpoFinal = corpo;
+        var notificationId = notification.getId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                expoPushService.send(destino, titulo, corpoFinal, notificationId);
+            }
+        });
     }
 }

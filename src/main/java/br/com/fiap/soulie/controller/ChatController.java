@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,7 +28,7 @@ public class ChatController {
 
     @PostMapping("/soulie-ia")
     @Operation(summary = "Pergunta para a Soulie IA", description = "Envie a mensagem e, se a tela tiver uma missão aberta, o contexto dela.")
-    public ResponseEntity<ChatReply> soulieIa(@Parameter(hidden = true) @AuthenticationPrincipal User user, @RequestBody ChatRequest request) {
+    public ResponseEntity<ChatReply> soulieIa(@Parameter(hidden = true) @AuthenticationPrincipal User user, @RequestBody @Valid ChatRequest request) {
         return ResponseEntity.ok(chatApiService.reply(user, request));
     }
 }

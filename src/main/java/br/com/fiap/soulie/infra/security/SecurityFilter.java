@@ -46,11 +46,14 @@ public class SecurityFilter extends OncePerRequestFilter {
             "/swagger-ui.html",
             "/swagger-ui/**",
             "/error",
-            // Callback da IA: a autenticacao dele e a assinatura HMAC, conferida
-            // no proprio controller. Se o filtro rodasse aqui, um cabecalho
+            // Callback da IA: a autenticação dele é a assinatura HMAC, conferida
+            // no próprio controller. Se o filtro rodasse aqui, um cabeçalho
             // Authorization obsoleto na chamada do parceiro derrubaria o webhook
             // com 401 antes de a assinatura sequer ser olhada.
-            "/webhooks/**"
+            //
+            // Rota EXATA, não o prefixo "/webhooks/**": com o prefixo, o próximo
+            // controller criado sob /webhooks perderia o JWT em silêncio.
+            "/webhooks/validations"
     );
 
     private final AntPathMatcher matcher = new AntPathMatcher();

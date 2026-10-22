@@ -10,6 +10,7 @@ import br.com.fiap.soulie.domain.activity.ActivityApiService;
 import br.com.fiap.soulie.domain.profile.ProfileApiService;
 import br.com.fiap.soulie.domain.user.User;
 import io.swagger.v3.oas.annotations.Operation;
+import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -56,14 +57,14 @@ public class MeController {
     @PatchMapping("/settings")
     @Operation(summary = "Atualiza avisos", description = "Liga ou desliga notificação no app, resumo semanal, cutucadas e nome no jardim.")
     public ResponseEntity<UserProfileResponse> settings(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                        @RequestBody UpdateSettingsRequest request) {
+                                                        @RequestBody @Valid UpdateSettingsRequest request) {
         return ResponseEntity.ok(profileApiService.updateSettings(user, request));
     }
 
     @PutMapping("/push-token")
     @Operation(summary = "Registra o token de push", description = "Guarda o Expo Push Token do aparelho para avisar cutucadas com o app fechado.")
     public ResponseEntity<Void> registerPushToken(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                  @RequestBody RegisterPushTokenRequest request) {
+                                                  @RequestBody @Valid RegisterPushTokenRequest request) {
         profileApiService.registerPushToken(user, request == null ? null : request.token());
         return ResponseEntity.noContent().build();
     }
@@ -82,9 +83,18 @@ public class MeController {
     }
 
     @PostMapping("/activities")
-    @Operation(summary = "Registra uma ação", description = "Se o texto contiver o nome de uma missão do dia ainda aberta, ela é concluída e a sequência do dia sobe uma vez.")
+    @Operation(summary = "Registra uma ação livre",
+            description = """
+                    Registra uma atividade ecológica no histórico. O XP é opcional e limitado a 50.
+
+                    NÃO conclui missão do catálogo: desde que existe validação por IA, missão só \
+                    se conclui por POST /v1/missions/{id}/validate, com foto. Se o texto mencionar \
+                    o nome de uma missão, a requisição é recusada com orientação.""")
     public ResponseEntity<ActivityResponse> addActivity(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                        @RequestBody CreateActivityRequest request) {
+                                                        // @Valid é obrigatório: sem ele o @Max do
+                                                        // DTO não roda, e o XP vindo do cliente
+                                                        // voltaria a entrar sem teto.
+                                                        @RequestBody @Valid CreateActivityRequest request) {
         return ResponseEntity.ok(activityApiService.create(user, request));
     }
 }

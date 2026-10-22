@@ -8,6 +8,7 @@ import br.com.fiap.soulie.domain.garden.dto.GardenResponse;
 import br.com.fiap.soulie.domain.user.User;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -42,14 +43,14 @@ public class GardenController {
 
     @PostMapping
     public ResponseEntity<GardenResponse> createGarden(
-            @RequestBody GardenRequest request, @AuthenticationPrincipal User user, UriComponentsBuilder builder) {
+            @RequestBody @Valid GardenRequest request, @AuthenticationPrincipal User user, UriComponentsBuilder builder) {
         var detail = service.createGarden(request, user.getId());
         var uri = builder.path("/garden/{id}").buildAndExpand(detail.id()).toUri();
         return ResponseEntity.created(uri).body(detail);
     }
 
     @PatchMapping
-    public ResponseEntity<GardenResponse> addUserToGarden(@RequestBody AddUserToGardenData data, @AuthenticationPrincipal User user) {
+    public ResponseEntity<GardenResponse> addUserToGarden(@RequestBody @Valid AddUserToGardenData data, @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(service.addUserToGarden(data, user.getId()));
     }
 }
