@@ -1,5 +1,6 @@
 package br.com.fiap.soulie.infra.security;
 
+import br.com.fiap.soulie.infra.ratelimit.RateLimitFilter;
 import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,9 @@ public class SecurityConfig {
 
     @Autowired
     private RestAuthenticationEntryPoint authenticationEntryPoint;
+
+    @Autowired
+    private RateLimitFilter rateLimitFilter;
 
     /**
      * Origens autorizadas a chamar a API pelo navegador.
@@ -110,7 +114,13 @@ public class SecurityConfig {
 
                     req.anyRequest().authenticated();
                 })
+                // O rate limit roda ANTES da autenticacao: POST /login e
+                // POST /user sao publicos e precisam chegar ja protegidos. Sem
+                // isso, forca bruta de senha e criacao em massa de conta nao
+                // teriam teto — e conta em massa e o insumo de quase todo
+                // achado das auditorias deste projeto.
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(rateLimitFilter, SecurityFilter.class)
                 .build();
     }
 

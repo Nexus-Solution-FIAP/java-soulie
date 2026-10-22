@@ -30,6 +30,7 @@
         <java.version>21</java.version>
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
         <awssdk.version>2.49.6</awssdk.version>
+        <bucket4j.version>8.21.0</bucket4j.version>
     </properties>
 
     <dependencyManagement>
@@ -67,6 +68,41 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-amqp-test</artifactId>
             <scope>test</scope>
+        </dependency>
+
+        <!--
+            Redis para o rate limit distribuido. OPCIONAL em runtime: se nao
+            houver Redis configurado ou ele cair, o limite degrada para memoria
+            por instancia (ver infra/ratelimit). O starter continua se chamando
+            spring-boot-starter-data-redis no Boot 4.1 (conferido no Central).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!--
+            Bucket4j: o algoritmo de token bucket.
+            NAO usamos o bucket4j-spring-boot-starter (autoconfiguracao): a
+            ultima release dele e contra Boot 4.0.3 e nao ha release para 4.1.x.
+            De todo modo precisamos de filtro proprio, porque os limites sao por
+            rota e por identidade (usuario autenticado vs IP real do Cloudflare).
+
+            Sobre a versao do Lettuce: o modulo -lettuce declara lettuce-core
+            6.1.8 como `provided`, e o Boot 4.1.1 traz 7.5.2. O escopo provided e
+            so o piso de compilacao, e o modulo roda contra Lettuce 7.x na
+            pratica. O que quebraria e o Lettuce 8, que remove as APIs Reactor.
+        -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-lettuce</artifactId>
+            <version>${bucket4j.version}</version>
         </dependency>
 
         <!-- Storage das imagens de evidencia: bucket do Railway, compativel com S3. -->

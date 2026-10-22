@@ -67,9 +67,28 @@ public class SecurityFilter extends OncePerRequestFilter {
     @Autowired
     private RestAuthenticationEntryPoint entryPoint;
 
+    /**
+     * O caminho da requisicao, de forma confiavel.
+     *
+     * <p>Nao usa {@code getServletPath()}: ele vem vazio em varios arranjos e
+     * muda se alguem definir {@code spring.mvc.servlet.path}. Como esta decisao
+     * aqui define se o filtro de autenticacao roda ou nao, uma divergencia
+     * entre o que este metodo ve e o que o {@code SecurityConfig} ve viraria
+     * pulo de autenticacao. No RateLimitFilter o mesmo descuido fez o filtro
+     * nunca aplicar o limite num teste inteiro.
+     */
+    private String caminhoDe(HttpServletRequest request) {
+        String uri = request.getRequestURI();
+        String contexto = request.getContextPath();
+        if (contexto != null && !contexto.isEmpty() && uri.startsWith(contexto)) {
+            return uri.substring(contexto.length());
+        }
+        return uri;
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getServletPath();
+        String path = caminhoDe(request);
         if (ROTAS_PUBLICAS.stream().anyMatch(padrao -> matcher.match(padrao, path))) {
             return true;
         }

@@ -67,3 +67,11 @@ soulie:
     api-key: ""
     webhook-enabled: false
     webhook-secret: "segredo-de-teste-do-webhook-com-tamanho-suficiente"
+
+  cloudflare:
+    enabled: false
+  ratelimit:
+    # Desligado por padrão nos testes: cada classe de teste faz dezenas de
+    # chamadas e bateria no limite. Os testes do próprio rate limit ligam
+    # explicitamente.
+    enabled: false

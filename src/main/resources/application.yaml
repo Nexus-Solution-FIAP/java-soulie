@@ -19,6 +19,16 @@ spring:
     baseline-on-migrate: true
     baseline-version: 0
   data:
+    redis:
+      # A autoconfiguração do Redis não aceita host vazio, então o padrão é
+      # localhost. Quem decide se o Redis é usado de fato é
+      # `soulie.ratelimit.distributed` — com ela em false, a conexão nunca é
+      # aberta e o limite vale por instância.
+      host: "${REDIS_HOST:localhost}"
+      port: "${REDIS_PORT:6379}"
+      password: "${REDIS_PASSWORD:}"
+      timeout: 2s
+      connect-timeout: 2s
     web:
       pageable:
         # Teto de paginação. Sem isto, `GET /user?size=2000` funcionava e dava
@@ -107,3 +117,74 @@ soulie:
     webhook-secret: "${AI_WEBHOOK_SECRET:}"
     webhook-tolerance: PT5M
     callback-url: "${AI_CALLBACK_URL:}"
+
+  cloudflare:
+    # Ligue SÓ quando a API estiver de fato atrás do Cloudflare. Com isto
+    # ligado, CF-Connecting-IP passa a ser aceito — mas apenas quando a conexão
+    # vem das faixas abaixo. Aceitar o cabeçalho de qualquer origem é bypass
+    # direto: basta mandar um IP diferente por requisição.
+    enabled: "${CLOUDFLARE_ENABLED:false}"
+    # Vazio usa as faixas publicadas pelo Cloudflare, embutidas na aplicação.
+    trusted-ips: "${CLOUDFLARE_TRUSTED_IPS:}"
+
+  ratelimit:
+    enabled: "${RATE_LIMIT_ENABLED:true}"
+    # Ligue quando houver um Redis provisionado. Com false, o limite é por
+    # instância: continua barrando o abuso óbvio, mas com N instâncias o teto
+    # real é N vezes maior.
+    distributed: "${RATE_LIMIT_DISTRIBUTED:false}"
+    default-capacity: 120
+    default-window: PT1M
+    rules:
+      # Rotas públicas: a chave é o IP, porque ainda não há usuário.
+      - method: POST
+        path: /login
+        capacity: 5
+        window: PT1M
+        by-ip: true
+      - method: POST
+        path: /user
+        capacity: 3
+        window: PT1H
+        by-ip: true
+      - method: POST
+        path: /webhooks/validations
+        capacity: 60
+        window: PT1M
+        by-ip: true
+      # Upload mais chamada PAGA de IA.
+      - method: POST
+        path: /v1/missions/*/validate
+        capacity: 10
+        window: PT1H
+      - method: POST
+        path: /api/v1/missions/*/validate
+        capacity: 10
+        window: PT1H
+      # Seguir é vetor de spam e insumo de enumeração.
+      - method: POST
+        path: /v1/social/follow/*
+        capacity: 30
+        window: PT1H
+      - method: POST
+        path: /api/v1/social/follow/*
+        capacity: 30
+        window: PT1H
+      # Listas do grafo: amplificação de consulta.
+      - method: GET
+        path: /v1/social/**
+        capacity: 60
+        window: PT1H
+      - method: GET
+        path: /api/v1/social/**
+        capacity: 60
+        window: PT1H
+      # Spam no feed.
+      - method: POST
+        path: /v1/community/feed/**
+        capacity: 20
+        window: PT1H
+      - method: POST
+        path: /api/v1/community/feed/**
+        capacity: 20
+        window: PT1H

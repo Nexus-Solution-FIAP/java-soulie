@@ -4,10 +4,16 @@ import br.com.fiap.soulie.TestData;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
 import br.com.fiap.soulie.domain.user.dto.UserResponse;
+import br.com.fiap.soulie.infra.cloudflare.ClientIpResolver;
+import br.com.fiap.soulie.infra.cloudflare.CloudflareProperties;
+import br.com.fiap.soulie.infra.ratelimit.InMemoryRateLimitStore;
+import br.com.fiap.soulie.infra.ratelimit.RateLimitFilter;
+import br.com.fiap.soulie.infra.ratelimit.RateLimitProperties;
 import br.com.fiap.soulie.infra.security.RestAuthenticationEntryPoint;
 import br.com.fiap.soulie.infra.security.SecurityConfig;
 import br.com.fiap.soulie.infra.security.TokenService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.ActiveProfiles;
@@ -19,7 +25,17 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 // Configuração comum dos testes de controller:
 // - @Import traz as regras de segurança reais do projeto (rotas liberadas/protegidas)
 // - TokenService e UserRepository são dependências do SecurityFilter, então viram mocks
-@Import({SecurityConfig.class, RestAuthenticationEntryPoint.class})
+// O SecurityConfig depende do RateLimitFilter, que depende do ClientIpResolver
+// e do store em memoria. Todos sao @Component simples, entao vem os reais —
+// mockar aqui faria o teste divergir do que roda em producao.
+@Import({
+        SecurityConfig.class,
+        RestAuthenticationEntryPoint.class,
+        RateLimitFilter.class,
+        ClientIpResolver.class,
+        InMemoryRateLimitStore.class
+})
+@EnableConfigurationProperties({RateLimitProperties.class, CloudflareProperties.class})
 @ActiveProfiles("test")
 abstract class ControllerTestBase {
 
