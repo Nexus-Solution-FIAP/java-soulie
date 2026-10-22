@@ -8,25 +8,39 @@
 |---|---|---|
 | 0 | `CLAUDE.md`, agentes, skills, hook de segurança, `.gitignore` + `.env.example` | ✅ concluída |
 | 1 | Correções de segurança + perfis do Spring (`dev`/`prod`/`test`) | ✅ pronta e auditada |
-| 1b | Travar rotas legadas `/user` + 13 itens da auditoria | ✅ pronta, aguardando re-auditoria |
+| 1b | Travar rotas legadas `/user` + 13 itens da auditoria | ✅ commitada |
+| 3b | Remediação da auditoria do código portado (3 críticas, 2 altas, 6 médias) + migration V21 | ✅ commitada |
 | 2 | Port dos domínios do `soulie-soul-up` + migrations V19/V20 | ✅ 49 arquivos, compila | 
-| 3 | Port da suíte de testes em H2 | ✅ **79 testes passando**, `./mvnw clean verify` verde |
-| 4 | Pipeline de IA: storage S3, RabbitMQ, cliente da IA, webhook HMAC, migration V21 | ⬜ não iniciada |
-| 5 | Social: follow/amizade, endpoints, migration V22 | ⬜ não iniciada |
-| 6 | Cloudflare + rate limit distribuído (Bucket4j/Redis) | ⬜ não iniciada |
+| 3 | Port da suíte de testes em H2 | ✅ commitada |
+| 4 | Pipeline de IA: storage S3, RabbitMQ, cliente da IA, webhook HMAC, migration **V22** | ✅ commitada (`f6d5387`), aguardando auditoria |
+| 5 | Social: follow/amizade, endpoints, migration **V23** | ✅ commitada (`d6668f0` + `2e51c70`) |
+| 6 | Cloudflare + rate limit, com Redis opcional | ✅ commitada, **auditada e remediada** |
+| 7a | Abrir os pull requests (21 PRs empilhados) | 🟡 em andamento |
 | 7 | Documentação `docs/01`–`08` + README + revisão final de segurança | ⬜ não iniciada |
 
 Legenda: ⬜ não iniciada · 🟡 em andamento · ✅ concluída e revisada pelo `security-auditor` · ⚠️ bloqueada
 
 **Branch:** `feature/integracao-soulup-ia-infra`, criada a partir de `feature/adding-soulie-app-endpoints`. A branch original está intacta.
 
-**Estado do build:** `./mvnw clean verify` → **BUILD SUCCESS, 79 testes, 0 falhas**. Antes deste trabalho havia 1 teste trivial que nem rodava sem um PostgreSQL de verdade.
+**Estado do build:** `./mvnw clean verify` → **BUILD SUCCESS, 148 testes, 0 falhas**. Antes deste trabalho havia 1 teste trivial que nem rodava sem um PostgreSQL de verdade.
+
+**Commits na branch:** 12, de `739b53c` a `29db85e` — Fase 0, Fases 1+1b, Fase 2, Fase 3, Fase 3b, Fase 4 (+ remediação), Fase 5 (+ remediação) e Fase 6. Somam **181 arquivos e +11.462 −468 linhas** contra a branch base.
+
+**Os PRs:** o trabalho é publicado em **21 PRs empilhados** sobre `feature/adding-soulie-app-endpoints`, não num diff único — ver a seção "Fase 7a" no fim deste documento.
 
 ### Registro de decisões e mudanças
 
 | Data | O que mudou |
 |---|---|
+| 2026-10-22 | **Auditoria da Fase 6: o rate limit era decorativo.** O `ProxyConfig` que eu adicionei na propria Fase 6 registrava `ForwardedHeaderFilter` em `HIGHEST_PRECEDENCE`, e esse filtro **sobrescreve `getRemoteAddr()`** com o valor mais a esquerda de `X-Forwarded-For`. Ou seja, o “IP do socket, que o cliente nao controla” — frase que eu escrevi no javadoc e repeti no corpo do PR — vinha de um cabecalho. **Medido: mesmo socket, cabecalho variando, 8 requisicoes, todas passando, `remaining=2` em todas.** Estar atras do Cloudflare nao protegia, porque ele *acrescenta* a lista em vez de substituir. Tres outros graves junto: a chave nunca era o id do usuario (o filtro roda antes da autenticacao, entao o contexto esta sempre vazio — o ramo era codigo morto e tudo era por IP, punindo quem compartilha NAT); o mapa em memoria nao tinha teto nem evicao, com chave vinda do cliente, e **esse e o modo padrao, nao o degradado**; e `InetAddress.getByName` resolve **nome de dominio**, o que virava consulta DNS sem timeout na thread da requisicao com entrada do atacante. Corrigidos no PR 20, com os testes de `X-Forwarded-For` e `Forwarded` que nao existiam — e que falham no codigo antigo. **A licao que se repete:** o teste chamado `cabecalhoForjadoNaoZeraContador` tinha a palavra BYPASS no nome e provava o caso trivial, porque a confianca esta desligada no perfil de teste. Terceira vez neste projeto que um nome ou comentario meu afirma uma protecao que o codigo nao tem. |
+| 2026-10-22 | **Fase 7a: o trabalho vai para 20 PRs empilhados, não um diff único.** 181 arquivos não são revisáveis, e como boa parte disto é correção de segurança, ser lido de verdade é o ponto. A divisão foi feita onde o código se separa, e **duas vezes ela foi recusada pelo código**: o pipeline de IA é circular no nível de pacote (`ValidationService` → `infra/messaging`, `ValidationConsumer` → `domain/validation`), e catálogo de recompensas + papel de admin compartilham a `V21` — separá-los deixaria uma entidade sem a coluna correspondente na migration, a mesma divergência que já pegou este projeto três vezes. Regra adotada: **todo PR compila e passa nos testes**, mesmo passando de 15 arquivos, e os sete que passam justificam no corpo e nomeiam os arquivos com lógica real. |
 | 2026-10-20 | Plano inicial escrito. Decisões do usuário registradas na seção "Decisões já tomadas". Verificado que o `bucket4j-spring-boot-starter` não suporta Boot 4.1 → usar a biblioteca core com filtro próprio. |
+| 2026-10-22 | **Fase 4 concluída: pipeline de validação por IA.** Fecha a peça que os dois repositórios esperavam e nenhum implementou. Descoberta ao ler o código: o `aiDetections` que o app mostrava era uma **tabela de frases fixas** escolhida por palavra-chave na tag da missão — nunca olhava a foto e respondia igual **mesmo sem foto nenhuma**. Removida. Uma tabela de evidência e uma de validação servem os **dois** modelos de missão, com `CHECK` garantindo exatamente um vínculo, então o worker grava `APPROVED` num lugar só e isso destrava o fluxo legado e credita a recompensa do `/v1` ao mesmo tempo. O achado CRÍTICO do `getOriginalFilename()` foi fechado: a chave do objeto agora é UUID do servidor. Testes: 91 → 112. |
+| 2026-10-22 | **Dependências verificadas, não supostas.** `spring-boot-starter-amqp` **é** o artefato certo no Boot 4.1.1: confirmado no BOM local e no Maven Central (o `-amqp` responde HTTP 200 e o `-rabbitmq` responde **404**). O rename entrou no 4.1.0-M3, foi **revertido no M4** e está reagendado para o 4.2 — as listagens que falam dele descrevem outra versão. O AWS SDK **não** é gerenciado pelo BOM do Boot, então entra pelo BOM próprio (2.49.6), com o cliente Netty excluído. |
+| 2026-10-22 | **A divergência entidade/migration pegou de novo.** `Validation.detections` usava `columnDefinition = "TEXT"`, que é tipo do PostgreSQL: o H2 do perfil de teste não o conhece e o schema dos testes **nem era criado**. Virou `VARCHAR(2000)` nos dois lados. É exatamente a regra que eu já havia registrado no `CLAUDE.md` depois da Fase 3 — e ainda assim escorreguei nela. |
+| 2026-10-21 | **Fase 3b: remediação da auditoria do código portado.** O código vindo do `soulie-soul-up` nunca tinha passado por revisão de segurança, e a auditoria achou **3 críticas**: (a) o cliente escolhia o preço da recompensa — `POST /reward` recebia o texto do benefício **e** o valor em pontos no corpo, então dava para resgatar qualquer coisa por 1 ponto; (b) corrida de duplo gasto, porque validar e depois subtrair em memória permite duas requisições simultâneas gastarem o mesmo saldo — e o comentário que eu havia escrito em `spendPoints` afirmava falsamente que a guarda resolvia isso; (c) `POST /action` deixava qualquer usuário autenticado escrever no catálogo global e definir quantos pontos a ação vale, o que na Fase 4 viraria overflow de `int` no XP. Resolvidas com tabela `reward_catalog`, débito atômico no banco (`UPDATE ... WHERE points >= :n` + `CHECK (points >= 0)`) e papel `ADMIN` de verdade. Migration **V21**. |
+| 2026-10-21 | **Bug confirmado: duas rotas portadas estavam quebradas.** `GET /mission/{id}` e `GET /evidence/mission/{missionId}` estouravam `LazyInitializationException` em **toda** chamada — `open-in-view: false` fecha a sessão quando o repository retorna, e os métodos de leitura não eram `@Transactional`. A auditoria marcou como suspeita; escrevi o teste que reproduz e confirmei. Detalhe instrutivo: a primeira versão do teste **passava sem provar nada**, porque `@DataJpaTest` envolve cada teste numa transação e a entidade nunca ficava destacada — foi preciso `@SpringBootTest` fora de transação. |
+| 2026-10-21 | **A auditoria também achou 3 regressões minhas da rodada anterior:** o log de violação de integridade gravava o e-mail duplicado da pessoa; a captura larga de `RuntimeException` no filtro transformava banco fora do ar em 401, fazendo o cliente descartar o token enquanto o alerta de 5xx nunca disparava; e o handler de 409 que eu adicionei **reabriu** o oráculo de enumeração de contas no cadastro, desfazendo por outra porta o que havia sido fechado no login. Corrigidas — e, no caso da enumeração, registrei no código que a correção **reduz mas não fecha**: fechar de verdade exige confirmação por e-mail, que o projeto não tem. |
 | 2026-10-21 | **Fase 3 concluída: 79 testes passando.** Os 28 arquivos portados rodam em H2. Quatro expectativas precisaram mudar, todas por diferença legítima de modelo e nenhuma enfraquecendo asserção: (a) e (b) dois testes esperavam **403 sem credencial** e agora recebem **401** — isso é correção, não regressão: 403 era consequência de não existir `AuthenticationEntryPoint`, e sem credencial o correto é 401; (c) `MissionControllerTest` afirmava sobre `$.experience`, campo que o `AvatarResponse` do `java-soulie` não tem; (d) `MissionTest` esperava XP 30 e agora espera 130, porque aqui `xp` é o total acumulado e não o XP dentro do nível. |
 | 2026-10-21 | **Bug de mapeamento achado pelos testes.** O log do Hibernate mostrou `create table "validations" ("resultValidation" ...)` — camelCase. Três campos portados (`resultValidation`, `pointsEarned`, `pointsSpent`) dependiam de nomeação **implícita**: em produção o Hibernate converte para snake_case e acerta, mas no perfil de teste o `globally_quoted_identifiers` **pula** essa conversão. Resultado: o teste gerava `resultValidation` e produção usa `result_validation`, então o teste nunca exercitava o nome real da coluna. Resolvido com `@Column(name = ...)` explícito nos três. |
 | 2026-10-21 | **Fase 1b concluída.** Rotas legadas `/user` travadas no próprio usuário, e os 13 itens da auditoria corrigidos. O scanner determinístico agora reporta 164 arquivos limpos e 2 com achado — e os 2 são conhecidos e rastreados (`getOriginalFilename` resolve na Fase 4; `permitAll` sem rate limit, na Fase 6). |
@@ -546,3 +560,144 @@ As fases **4 e 5 são genuinamente independentes** e podem rodar em sessões sep
 - **Cloudflare R2** — as imagens vão para o bucket do Railway.
 - **Unificar `Mission` e `DailyMission`** em um só modelo. Seria o ideal arquitetural, mas quebraria o contrato `/v1` do app. Ficam coexistindo, em tabelas separadas, com a razão documentada.
 
+
+---
+
+## Fase 7a — Abrir os pull requests
+
+### Por que isto é uma fase, e não um `git push`
+
+O trabalho inteiro está numa branch única com 12 commits, **181 arquivos e
++11.462 −468 linhas** contra a branch base. Um diff desse tamanho não é revisável:
+ninguém o lê com atenção, e um PR que não é lido não é revisão, é carimbo. Como
+boa parte deste trabalho são correções de segurança — senha em texto puro, IDOR
+que desfazia exclusão de conta, bypass de XP — ser lido de verdade é o ponto.
+
+### Duas decisões que definem a estrutura
+
+**1. Os PRs apontam para `feature/adding-soulie-app-endpoints`, não para `develop`.**
+Os 6 primeiros commits da branch não são meus: vêm do contrato `/v1` do app
+(172 arquivos). Apontando para a branch base, o diff de cada PR mostra **só** o
+trabalho desta integração. A consequência tem que ficar registrada: estes PRs só
+podem ser mesclados em `develop` **depois** que a branch base for — e o PR da
+base é da equipe, não meu, porque eu não revisei aqueles 172 arquivos.
+
+**2. PRs empilhados: cada um tem o anterior como base.** O trabalho é
+genuinamente dependente — o port da Fase 2 não compila sem as correções da
+Fase 1. Empilhar é o que mantém cada diff pequeno e cada PR compilável ao mesmo
+tempo. Eles são mesclados na ordem.
+
+### A regra que vence o teto de 15 arquivos
+
+**Todo PR compila e passa nos testes.** O teto de ~15 arquivos é heurística de
+revisão; "o PR compila" é requisito. Onde os dois conflitam, o build ganha — e o
+corpo do PR diz por que passou do teto e **quais arquivos carregam lógica de
+verdade**, já que no port a maior parte é reescrita mecânica de pacote.
+
+Isso não é desculpa: a divisão foi feita onde o código realmente se separa, e
+duas vezes a separação foi recusada **pelo código**, não por conveniência:
+
+- **O pipeline de IA não se divide.** `ValidationService` importa
+  `infra/messaging`, e `ValidationConsumer` importa `domain/validation`: é
+  circular no nível de pacote. Só `infra/storage` sai limpo, porque a dependência
+  ali é de mão única. Quebrar o resto exigiria escrever stubs que ninguém vai
+  revisar — trabalho falso.
+- **Catálogo de recompensas e papel de admin compartilham a `V21`.** Separados em
+  dois PRs, um deles ficaria com a entidade sem a coluna correspondente na
+  migration. É exatamente a divergência entidade/migration que o `CLAUDE.md`
+  proíbe, e que já pegou este projeto três vezes. Ficam juntos.
+
+### Os 21 PRs
+
+Com os tamanhos reais, medidos depois de construir a pilha. A coluna "arqs" é o
+diff do PR, não o acumulado.
+
+| # | Título | Arqs | O que de fato precisa de revisão |
+|---|---|---|---|
+| 1 | `chore: infraestrutura de agentes, skills e varredura de segurança` | 15 | `CLAUDE.md`, 3 agentes, 4 skills, hook determinístico. Nenhum código de produção. |
+| 2 | `fix: corrige autenticação e sessão` | 7 | NPE com usuário removido; 500 virando 401; **token de 5h em vez de 2**, por somar horas em hora local e converter com offset fixo `-03:00` num servidor UTC. |
+| 3 | `fix: tratamento de erros e perfis do Spring` | 8 | `getLocalizedMessage()` no corpo da resposta; CORS por allowlist que **falha o boot** em curinga; perfil default `prod`. |
+| 4 | `fix: trava as rotas legadas /user no próprio usuário` | 6 | **Senha em texto puro** no `PUT`; IDOR no `PATCH` que reativava conta de terceiro, desfazendo a exclusão pedida pelo titular; `?size=2000` entregando o e-mail de toda a base. |
+| 5 | `feat: porta os domínios action, reward e history_points` | 22 | Reconecta entidades a tabelas órfãs (V4–V11). `spendPoints` entra com guarda. |
+| 6 | `feat: porta mission legado, evidence e validation` | 17 | Migrations **V19/V20**; `APROVED`→`APPROVED` e `FAILED` novo, para separar falha de infra de reprovação legítima. |
+| 7 | `feat: porta a cadeia de validators e os controllers legados` | 15 | As 4 cadeias, idênticas à origem. Zero colisão de rota. |
+| 8 | `test: harness de testes em H2` | 7 | `pom` (starter-test + h2), perfil `test`, as 3 classes-base. |
+| 9 | `test: porta a suíte do soulie-soul-up` | 24 | 79 testes onde havia 1 que nem executava. 4 expectativas ajustadas, nenhuma asserção enfraquecida. |
+| 10 | `feat: catálogo de recompensas, débito atômico e papel de admin` | 27 | **O cliente escolhia o preço**; corrida de duplo gasto; `POST /action` aberto a qualquer autenticado com `points` livre — overflow de `int` no XP armado. V21. |
+| 11 | `fix: @Transactional nas leituras, ordem dos validators e limites de entrada` | 7 | **Duas rotas davam 500 em toda chamada**; sem ordem na cadeia, regra de estado respondia sobre a missão de outra pessoa; `image` aceitava `file://` e o endpoint de metadados da infra. |
+| 12 | `fix: corrige três regressões introduzidas na rodada anterior` | 2 | O log gravava o e-mail da pessoa; banco fora do ar virava 401; o 409 que eu adicionei reabriu a enumeração de contas. |
+| 13 | `feat: storage de imagem compatível com S3` | 11 | Magic bytes em vez de `Content-Type`; chave UUID do servidor em vez do nome do arquivo do cliente. |
+| 14 | `feat: pipeline de validação de imagem por IA` | 30 | V22; remove a **tabela de frases fixas** que o app exibia como análise de IA; 202 + `validationId`; publicação após o commit; consumidor idempotente. |
+| 15 | `feat: webhook de validação assinado por HMAC` | 5 | Endpoint público que **concede XP**: HMAC em tempo constante, anti-replay por timestamp, idempotência. Desligado por padrão. |
+| 16 | `fix: corrige o pipeline quebrado e fecha o bypass do XP` | 17 | O consumidor estourava em **toda** mensagem — nada era processado; `POST /me/activities` dava XP com texto livre, sem foto. |
+| 17 | `feat: grafo social com seguir e amizade mútua` | 12 | V23; amizade é propriedade derivada, não tabela. |
+| 18 | `fix: fecha a enumeração da base pelo grafo social` | 7 | `DELETE /follow/{id}` era leitura de perfil por id arbitrário; `?sort=followee.email` reabria por caminho aninhado o que já havia sido fechado. |
+| 19 | `feat: Cloudflare e rate limit, com Redis opcional` | 19 | `CF-Connecting-IP` só de faixa confiável — aceitá-lo de qualquer origem é bypass trivial; degrada para memória sem Redis. |
+| 20 | `fix: fecha o bypass do rate limit e a chave que nunca era do usuário` | 15 | **O limite do PR 19 era contornável com um cabeçalho de uma linha.** O `ProxyConfig` sobrescrevia `getRemoteAddr()` com `X-Forwarded-For`; a chave nunca era o id do usuário; o mapa em memória não tinha teto; e `getByName` resolvia nome de domínio. |
+| 21 | `docs: registra a divisão do trabalho em pull requests` | 1 | Este documento. |
+
+**Passam de 15 arquivos:** 5, 6, 9, 10, 14 e 19 — seis de vinte. Cada um justifica
+no corpo e nomeia os arquivos com lógica real. A mediana é de 12 arquivos.
+
+A coluna soma 278, mais que os 181 arquivos do diff total, e está correto: numa
+pilha o mesmo arquivo é tocado por vários PRs. `pom.xml`, `application.yaml`,
+`SecurityConfig` e `SecurityFilter` aparecem em vários, porque cada fase
+acrescenta uma dependência, uma chave de configuração ou uma regra de autorização.
+
+### Corpo padrão do PR
+
+```
+## O que muda          uma frase
+## Por que             o problema concreto; se é falha de segurança, COMO se explorava
+## Como revisar        os arquivos com lógica de verdade, nomeados; o resto é mecânico
+## Como testar         o comando e o que observar
+## Riscos e pendências o que pode quebrar e o que ficou de fora, com o motivo
+## Pilha               PR anterior → este → próximo
+```
+
+Títulos em Conventional Commits, que já é o padrão da branch.
+
+### Mecânica
+
+A branch original **não é tocada**: `feature/integracao-soulup-ia-infra` fica
+intacta como referência do estado correto, e é contra ela que a verificação final
+compara.
+
+Cada PR é uma branch nova sobre a anterior. Onde um commit é dividido, os
+arquivos vêm em subconjunto (`git checkout <sha> -- <caminhos>`); onde um arquivo
+de configuração acumula várias fases (`pom.xml`, `SoulieApplication`), a versão
+intermediária é escrita à mão, contendo só o que aquele PR precisa.
+
+### Verificação
+
+- `./mvnw clean test` verde em **cada** branch da pilha, não só na última.
+- **A ponta da pilha tem que ser idêntica à branch original.** É o que prova que
+  nada se perdeu na divisão: `git diff feature/integracao-soulup-ia-infra <ponta>`
+  precisa sair **vazio**. Comparar PR por PR não prova nada; a árvore final, sim.
+- Nenhum PR com base errada: o #1 aponta para a branch do app, os demais para o
+  anterior.
+
+**Resultado medido:** `./mvnw clean test` passou em cada uma das 21 branches, com
+a contagem de testes subindo de 1 para 148 ao longo da pilha. E
+`git diff 29db85e pr/19-cloudflare-rate-limit` saíu **vazio no código** quando a pilha foi
+construída (o PR 20 veio depois, da auditoria) — o último
+PR de código reproduz exatamente a árvore da branch original, então a divisão não
+perdeu nada. Só o PR 20, que é este documento, fica por cima.
+
+### Fora do escopo desta fase
+
+- **O PR da branch base** (`feature/adding-soulie-app-endpoints` → `develop`):
+  172 arquivos que não são meus e que eu não revisei.
+- **Fase 7**: `docs/01`, `02`, `05`–`08` e o README. Só `docs/03` e `docs/04`
+  existem, escritos junto com a Fase 4.
+- **O teste do caminho distribuído do Redis** não foi escrito. Eu disse que
+  escreveria e não escrevi: o `RedisRateLimitStore` não tem cobertura automática
+  nenhuma. O caminho em memória e o resolvedor de IP têm — e ganharam bastante
+  cobertura no PR 20. A auditoria apontou o defeito concreto que a ausência
+  esconde: o contrato de desserialização do `List<Long>` que vem do Lua não é
+  travado por nada, e um `ClassCastException` ali cairia no `catch` do filtro —
+  **fail-open silencioso em 100% das requisições**.
+- **Também da auditoria, e ainda aberto:** não há disjuntor para Redis
+  inalcançável (cada requisição paga o timeout antes de degradar), o script Lua
+  não reconserta TTL ausente, faltam regras por rota para `garden/join` e
+  `nudges`, e as regras do YAML não são validadas no boot.
