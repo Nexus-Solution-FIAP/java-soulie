@@ -8,6 +8,7 @@ import br.com.fiap.soulie.domain.avatar.enums.PlantType;
 import br.com.fiap.soulie.domain.evidence.Evidence;
 import br.com.fiap.soulie.domain.garden.Garden;
 import br.com.fiap.soulie.domain.mission.Mission;
+import br.com.fiap.soulie.domain.reward.RewardCatalog;
 import br.com.fiap.soulie.domain.mission.enums.MissionStatus;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.validation.Validation;
@@ -68,6 +69,14 @@ public abstract class RepositoryTestBase {
 
     protected Validation persistValidation(Evidence evidence, ResultValidation result) {
         return em.persist(new Validation(null, evidence, result));
+    }
+
+    protected RewardCatalog persistRewardCatalog(String benefits, int cost) {
+        return em.persist(RewardCatalog.builder()
+                .benefits(benefits)
+                .cost(cost)
+                .active(true)
+                .build());
     }
 
     protected Garden persistGarden(String name, User... users) {

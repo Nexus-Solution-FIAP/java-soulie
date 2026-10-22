@@ -39,6 +39,19 @@ abstract class ControllerTestBase {
         return user(loggedUser);
     }
 
+    protected final User adminUser = TestData.admin(2L);
+
+    /**
+     * Simula um administrador autenticado.
+     *
+     * <p>Usa as authorities derivadas do papel do proprio User, em vez de uma
+     * lista fixa: e assim que o SecurityConfig decide o acesso as rotas
+     * administrativas, e um atalho aqui faria o teste divergir da producao.
+     */
+    protected RequestPostProcessor loggedAsAdmin() {
+        return user(adminUser);
+    }
+
     protected UserResponse userResponse(Long id) {
         return new UserResponse(id, "Usuário " + id, 0, true);
     }

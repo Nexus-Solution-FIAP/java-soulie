@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ActionService {
@@ -14,10 +15,12 @@ public class ActionService {
     @Autowired
     private ActionRepository actionRepository;
 
+    @Transactional(readOnly = true)
     public Page<ActionResponse> listActions(Pageable pageable) {
         return actionRepository.findAll(pageable).map(ActionResponse::new);
     }
 
+    @Transactional(readOnly = true)
     public ActionResponse actionDetails(Long id) {
         var action = actionRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Ação não encontrada"));

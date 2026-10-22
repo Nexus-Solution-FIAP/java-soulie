@@ -6,8 +6,10 @@ import br.com.fiap.soulie.domain.avatar.enums.FlowerType;
 import br.com.fiap.soulie.domain.avatar.enums.Humor;
 import br.com.fiap.soulie.domain.avatar.enums.PlantType;
 import br.com.fiap.soulie.domain.mission.Mission;
+import br.com.fiap.soulie.domain.reward.RewardCatalog;
 import br.com.fiap.soulie.domain.mission.enums.MissionStatus;
 import br.com.fiap.soulie.domain.user.User;
+import br.com.fiap.soulie.domain.user.enums.UserRole;
 
 // "Fábrica" de objetos prontos para os testes não repetirem montagem de entidades
 public final class TestData {
@@ -23,6 +25,19 @@ public final class TestData {
                 .password("Senha@123")
                 .points(0)
                 .active(true)
+                .build();
+    }
+
+    /** Usuario com papel ADMIN, para as rotas administrativas. */
+    public static User admin(Long id) {
+        return User.builder()
+                .id(id)
+                .name("Admin " + id)
+                .email("admin" + id + "@soulie.com")
+                .password("Senha@123")
+                .points(0)
+                .active(true)
+                .role(UserRole.ADMIN)
                 .build();
     }
 
@@ -47,6 +62,15 @@ public final class TestData {
                 .plantType(PlantType.IPE_AMARELO)
                 .flowerType(FlowerType.GIRASSOL)
                 .user(user)
+                .build();
+    }
+
+    public static RewardCatalog rewardCatalog(Long id, String benefits, int cost) {
+        return RewardCatalog.builder()
+                .id(id)
+                .benefits(benefits)
+                .cost(cost)
+                .active(true)
                 .build();
     }
 

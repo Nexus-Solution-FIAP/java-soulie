@@ -4,6 +4,7 @@ import br.com.fiap.soulie.domain.action.ActionService;
 import br.com.fiap.soulie.domain.action.dto.ActionRequest;
 import br.com.fiap.soulie.domain.action.dto.ActionResponse;
 import jakarta.persistence.EntityNotFoundException;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
@@ -49,7 +50,7 @@ class ActionControllerTest extends ControllerTestBase {
     void createActionReturns201() throws Exception {
         when(service.createAction(new ActionRequest("Meditar", "10 minutos", 20))).thenReturn(action);
 
-        mvc.perform(post("/action").with(logged())
+        mvc.perform(post("/action").with(loggedAsAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Meditar", "description": "10 minutos", "points": 20}
@@ -61,13 +62,45 @@ class ActionControllerTest extends ControllerTestBase {
 
     @Test
     void createActionWithNegativePointsReturns400() throws Exception {
-        mvc.perform(post("/action").with(logged())
+        mvc.perform(post("/action").with(loggedAsAdmin())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Meditar", "description": "10 minutos", "points": -5}
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$[0].field").value("points"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    @DisplayName("Usuario comum nao escreve no catalogo de acoes")
+    void createActionAsRegularUserReturns403() throws Exception {
+        mvc.perform(post("/action").with(logged())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Acao injetada", "description": "x", "points": 20}
+                                """))
+                .andExpect(status().isForbidden());
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    @DisplayName("Pontos acima do teto sao recusados: evita overflow de int no XP")
+    void createActionAbovePointsCapReturns400() throws Exception {
+        mvc.perform(post("/action").with(loggedAsAdmin())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name": "Exploit", "description": "x", "points": 2000000000}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$[0].field").value("points"));
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void withoutTokenReturns401() throws Exception {
+        mvc.perform(get("/action"))
+                .andExpect(status().isUnauthorized());
         verifyNoInteractions(service);
     }
 }

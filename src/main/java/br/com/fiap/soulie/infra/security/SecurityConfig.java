@@ -90,6 +90,14 @@ public class SecurityConfig {
                     // Cloudflare na frente é a única barreira.
                     req.requestMatchers(HttpMethod.POST, "/login", "/user").permitAll();
                     req.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
+
+                    // Escrita no catalogo compartilhado de acoes e operacao
+                    // administrativa. Antes era aberta a qualquer autenticado: dava
+                    // para injetar conteudo no catalogo de todos e, pior, definir
+                    // quantos pontos a acao vale — com `points` grande o bastante,
+                    // concluir a missao causaria overflow de int no XP e no saldo.
+                    req.requestMatchers(HttpMethod.POST, "/action").hasRole("ADMIN");
+
                     req.anyRequest().authenticated();
                 })
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)

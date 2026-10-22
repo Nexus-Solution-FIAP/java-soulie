@@ -1,7 +1,9 @@
 package br.com.fiap.soulie.domain.user;
 
 import br.com.fiap.soulie.domain.garden.Garden;
+import br.com.fiap.soulie.infra.exception.BusinessException;
 import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
+import br.com.fiap.soulie.domain.user.enums.UserRole;
 import br.com.fiap.soulie.domain.user.dto.UserRequest;
 import jakarta.persistence.*;
 import jakarta.validation.Valid;
@@ -37,6 +39,11 @@ public class User implements UserDetails {
     private String password;
     private int points;
     private Boolean active;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role = UserRole.USER;
 
     private String handle;
 
@@ -162,18 +169,22 @@ public class User implements UserDetails {
     /**
      * Gasta pontos no resgate de uma recompensa.
      *
-     * <p>A versão desta regra no {@code soulie-soul-up} era apenas
-     * {@code this.points -= points}, sem guarda: por corrida entre dois resgates
-     * simultâneos o saldo podia ficar negativo, mesmo com o
-     * {@code SufficientPointsValidator} na frente. A checagem aqui é a última
-     * linha de defesa, dentro da própria entidade.
+     * <p><b>Esta guarda NÃO resolve corrida.</b> Ela impede saldo negativo
+     * dentro de uma transação, mas duas transações simultâneas leem o mesmo
+     * saldo, as duas passam por aqui e as duas gravam — gastando o mesmo saldo
+     * duas vezes. Quem resolve isso é o débito atômico em
+     * {@code UserRepository.debitPoints}, que o {@code RewardService} usa, mais
+     * o {@code CHECK (points >= 0)} da migration V21.
+     *
+     * <p>Mantida como última linha de defesa para quem manipular a entidade
+     * fora daquele caminho.
      */
     public void spendPoints(int amount) {
         if (amount <= 0) {
-            throw new IllegalArgumentException("A quantidade de pontos a gastar deve ser positiva");
+            throw new BusinessException("A quantidade de pontos a gastar deve ser positiva");
         }
         if (amount > this.points) {
-            throw new IllegalStateException("Saldo de pontos insuficiente");
+            throw BusinessException.conflito("Saldo de pontos insuficiente");
         }
         this.points -= amount;
     }
@@ -217,6 +228,9 @@ public class User implements UserDetails {
         if (active == null) {
             active = true;
         }
+        if (role == null) {
+            role = UserRole.USER;
+        }
         if (notificationsEnabled == null) {
             notificationsEnabled = true;
         }
@@ -233,7 +247,15 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        // Antes isto era ROLE_USER fixo, o que tornava inútil o
+        // @EnableMethodSecurity e deixava as operações de catálogo abertas a
+        // qualquer autenticado.
+        UserRole papel = role == null ? UserRole.USER : role;
+        return List.of(new SimpleGrantedAuthority(papel.authority()));
+    }
+
+    public boolean isAdmin() {
+        return role == UserRole.ADMIN;
     }
 
     @Override
