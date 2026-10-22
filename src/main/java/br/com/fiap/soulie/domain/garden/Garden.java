@@ -39,7 +39,13 @@ public class Garden {
     }
 
     public void addUserToGarden(User user) {
-        this.users.add(user);
+        if (user == null || user.getId() == null) {
+            return;
+        }
+        boolean already = this.users.stream().anyMatch(member -> user.getId().equals(member.getId()));
+        if (!already) {
+            this.users.add(user);
+        }
     }
 
 

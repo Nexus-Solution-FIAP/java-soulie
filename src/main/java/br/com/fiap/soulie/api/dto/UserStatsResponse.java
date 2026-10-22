@@ -11,6 +11,8 @@ public record UserStatsResponse(
         @Schema(example = "30") int xpToNextRank,
         @Schema(example = "2") int unlockedAchievementsCount,
         @Schema(example = "1.2") double co2SavedKg,
-        @Schema(example = "40") double waterSavedLiters
+        @Schema(example = "40") double waterSavedLiters,
+        @Schema(example = "3") int plantsUnlocked,
+        @Schema(example = "16") int plantsTotal
 ) {
 }

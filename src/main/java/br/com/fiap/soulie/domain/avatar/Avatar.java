@@ -68,7 +68,7 @@ public class Avatar {
         avatar.setXp(0);
         avatar.setHumor(Humor.NEUTRAL);
         avatar.setPlantType(PlantType.IPE_AMARELO);
-        avatar.setFlowerType(FlowerType.GIRASSOL);
+        avatar.setFlowerType(FlowerType.IPE_AMARELO);
         avatar.setUser(user);
         return avatar;
     }
@@ -103,9 +103,29 @@ public class Avatar {
     }
 
     public void changeFlower(FlowerType flower) {
-        if (flower != null) {
-            this.flowerType = flower;
+        applyPlant(flower, this.xp);
+    }
+
+    public void applyPlant(FlowerType flower, int plantXp) {
+        if (flower == null) {
+            return;
         }
+        this.flowerType = flower;
+        this.xp = Math.max(plantXp, 0);
+        this.level = SoulieLevel.levelOf(this.xp);
+        this.plantType = switch (flower) {
+            case IPE_AMARELO -> PlantType.IPE_AMARELO;
+            case GUAIMBE_ONDULADO -> PlantType.GUAIMBE_ONDULADO;
+            case MANACA_DA_SERRA -> PlantType.MANACA_DA_SERRA;
+            case MARANTA -> PlantType.MARANTA;
+            case PACOVA -> PlantType.PACOVA;
+            case PITANGUEIRA -> PlantType.PITANGUEIRA;
+            case RAINHA_DO_ABISMO -> PlantType.RAINHA_DO_ABISMO;
+            case TREVO_ROXO -> PlantType.TREVO_ROXO;
+            case MULUNGU -> PlantType.MULUNGU;
+            case SUCUPIRA_PRETA -> PlantType.SUCUPIRA_PRETA;
+            default -> this.plantType == null ? PlantType.IPE_AMARELO : this.plantType;
+        };
     }
 
     @PrePersist

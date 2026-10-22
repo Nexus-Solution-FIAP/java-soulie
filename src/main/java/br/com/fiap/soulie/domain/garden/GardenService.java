@@ -91,6 +91,11 @@ public class GardenService {
     }
 
     @Transactional
+    public Optional<CommunityGardenResponse> current(User user) {
+        return findMine(user).map(this::toCommunity);
+    }
+
+    @Transactional
     public List<User> members(User user) {
         return findMine(user)
                 .map(this::activeMembers)
@@ -111,19 +116,20 @@ public class GardenService {
 
     @Transactional
     public CommunityGardenResponse join(User user, String rawCode) {
-        String code = rawCode == null ? "" : rawCode.trim().toUpperCase(Locale.ROOT);
+        String code = normalizeInviteCode(rawCode);
         if (!code.matches("[A-Z0-9]{4,12}")) {
             throw new ValidationException("Código inválido");
         }
-        Garden target = repository.findByInviteCode(code)
-                .orElseThrow(() -> new ValidationException("Código de jardim não encontrado"));
+        Garden target = repository.findByInviteCodeIgnoreCase(code)
+                .orElseGet(() -> repository.findByInviteCode(code).orElse(null));
+        if (target == null) {
+            throw new ValidationException("Código de jardim não encontrado");
+        }
         User managed = userRepository.getReferenceById(user.getId());
         leaveAllExcept(managed, target.getId());
-        boolean already = target.getUsers().stream().anyMatch(member -> member.getId().equals(managed.getId()));
-        if (!already) {
-            target.addUserToGarden(managed);
-        }
-        return toCommunity(target);
+        target.addUserToGarden(managed);
+        Garden saved = repository.saveAndFlush(target);
+        return toCommunity(saved);
     }
 
     @Transactional
@@ -149,7 +155,7 @@ public class GardenService {
                 continue;
             }
             garden.getUsers().removeIf(member -> member.getId().equals(user.getId()));
-            repository.flush();
+            repository.saveAndFlush(garden);
             if (garden.getUsers().isEmpty()) {
                 repository.delete(garden);
             }
@@ -170,6 +176,13 @@ public class GardenService {
                 garden.getInviteCode(),
                 activeMembers(garden).size()
         );
+    }
+
+    private String normalizeInviteCode(String rawCode) {
+        if (rawCode == null) {
+            return "";
+        }
+        return rawCode.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.ROOT);
     }
 
     private String gardenName(User user) {

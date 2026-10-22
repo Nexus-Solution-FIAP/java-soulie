@@ -3,10 +3,12 @@ package br.com.fiap.soulie.domain.soulie;
 import br.com.fiap.soulie.api.dto.SoulieResponse;
 import br.com.fiap.soulie.api.dto.UpdateSoulieRequest;
 import br.com.fiap.soulie.api.dto.WaterResponse;
+import br.com.fiap.soulie.api.dto.PlantItemResponse;
 import br.com.fiap.soulie.domain.achievement.AchievementApiService;
 import br.com.fiap.soulie.domain.avatar.Avatar;
 import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.avatar.enums.FlowerType;
+import br.com.fiap.soulie.domain.plant.PlantCollectionService;
 import br.com.fiap.soulie.domain.user.User;
 import jakarta.validation.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 public class SoulieApiService {
@@ -25,10 +28,15 @@ public class SoulieApiService {
     @Autowired
     private AchievementApiService achievementApiService;
 
+    @Autowired
+    private PlantCollectionService plantCollectionService;
+
     @Transactional
     public Avatar getOrCreate(User user) {
-        return avatarRepository.findByUserId(user.getId())
+        Avatar avatar = avatarRepository.findByUserId(user.getId())
                 .orElseGet(() -> avatarRepository.save(Avatar.starter(user)));
+        plantCollectionService.ensureRows(user);
+        return avatar;
     }
 
     @Transactional
@@ -43,12 +51,13 @@ public class SoulieApiService {
             avatar.rename(request.name());
             if (request.flowerType() != null && !request.flowerType().isBlank()) {
                 try {
-                    avatar.changeFlower(FlowerType.from(request.flowerType()));
+                    plantCollectionService.activate(user, avatar, FlowerType.from(request.flowerType()));
                 } catch (IllegalArgumentException exception) {
                     throw new ValidationException(exception.getMessage());
                 }
             }
         }
+        plantCollectionService.persistAndEvaluate(user, avatar);
         return toResponse(avatar, user);
     }
 
@@ -60,6 +69,7 @@ public class SoulieApiService {
         if (wateredNow) {
             user.registerActivityDay(now.toLocalDate());
             achievementApiService.sync(user, avatar);
+            plantCollectionService.persistAndEvaluate(user, avatar);
         }
         int streak = user.currentStreak(now.toLocalDate());
         String message = wateredNow
@@ -85,5 +95,17 @@ public class SoulieApiService {
                 avatar.wasWateredOn(LocalDateTime.now().toLocalDate()),
                 lastWatered
         );
+    }
+
+    @Transactional
+    public List<PlantItemResponse> plants(User user) {
+        Avatar avatar = getOrCreate(user);
+        return plantCollectionService.catalog(user, avatar);
+    }
+
+    @Transactional
+    public List<PlantItemResponse> redeemCode(User user, String code) {
+        Avatar avatar = getOrCreate(user);
+        return plantCollectionService.redeemCode(user, avatar, code);
     }
 }

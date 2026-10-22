@@ -6,6 +6,7 @@ import br.com.fiap.soulie.domain.garden.GardenService;
 import br.com.fiap.soulie.domain.avatar.Avatar;
 import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.mission.UserMissionCompletionRepository;
+import br.com.fiap.soulie.domain.plant.PlantCollectionService;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +38,9 @@ public class AchievementApiService {
     @Autowired
     private AvatarRepository avatarRepository;
 
+    @Autowired
+    private PlantCollectionService plantCollectionService;
+
     @Transactional
     public List<Achievement> sync(User user, Avatar avatar) {
         List<Achievement> catalog = achievementRepository.findAllByOrderByIdAsc();
@@ -48,9 +52,7 @@ public class AchievementApiService {
             userRepository.saveAndFlush(user);
             avatarRepository.saveAndFlush(avatar);
             for (Achievement achievement : catalog) {
-                UserAchievement row = userAchievementRepository
-                        .findByUser_IdAndAchievement_Id(user.getId(), achievement.getId())
-                        .orElseGet(() -> userAchievementRepository.save(UserAchievement.start(user, achievement)));
+                UserAchievement row = rowFor(user, achievement);
                 int progress = progressOf(achievement, user, avatar);
                 row.updateProgress(progress);
                 if (achievement.reached(progress) && row.unlock(LocalDateTime.now())) {
@@ -63,6 +65,7 @@ public class AchievementApiService {
         }
         userRepository.saveAndFlush(user);
         avatarRepository.saveAndFlush(avatar);
+        plantCollectionService.persistAndEvaluate(user, avatar);
         return unlockedNow;
     }
 
@@ -74,10 +77,17 @@ public class AchievementApiService {
                 .toList();
     }
 
+    private UserAchievement rowFor(User user, Achievement achievement) {
+        return userAchievementRepository.findByUser_IdAndAchievement_Id(user.getId(), achievement.getId())
+                .orElseGet(() -> {
+                    userAchievementRepository.insertIfAbsent(user.getId(), achievement.getId());
+                    return userAchievementRepository.findByUser_IdAndAchievement_Id(user.getId(), achievement.getId())
+                            .orElseGet(() -> userAchievementRepository.save(UserAchievement.start(user, achievement)));
+                });
+    }
+
     private AchievementResponse toResponse(User user, Achievement achievement) {
-        UserAchievement row = userAchievementRepository
-                .findByUser_IdAndAchievement_Id(user.getId(), achievement.getId())
-                .orElseGet(() -> UserAchievement.start(user, achievement));
+        UserAchievement row = rowFor(user, achievement);
         String date = row.isUnlocked()
                 ? TimeLabels.unlockedDate(row.getUnlockedAt())
                 : row.getProgress() > 0 ? "Em progresso" : "Bloqueado";

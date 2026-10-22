@@ -17,6 +17,9 @@ public interface GardenRepository extends JpaRepository<Garden, Long> {
     @EntityGraph(attributePaths = "users")
     Optional<Garden> findByInviteCode(String inviteCode);
 
+    @EntityGraph(attributePaths = "users")
+    Optional<Garden> findByInviteCodeIgnoreCase(String inviteCode);
+
     boolean existsByInviteCode(String inviteCode);
 
     @EntityGraph(attributePaths = "users")

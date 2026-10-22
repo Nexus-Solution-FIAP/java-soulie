@@ -33,6 +33,8 @@ public class SpringDocConfig {
                                 Fluxo: `POST /user` cria a conta, `POST /login` devolve `tokenJWT`, e as rotas de perfil, Soulie, missões, conquistas, comunidade e chat pedem `Authorization: Bearer`.
                                 
                                 A primeira ação do dia (regar ou concluir uma missão) conta 1 dia na sequência. No mesmo dia o número não sobe de novo.
+                                
+                                No cadastro o usuário escolhe 1 planta da flora brasileira. As outras liberam por missões, conquistas, nível máximo ou código secreto (`GET /v1/soulie/plants`, `POST /v1/soulie/plants/unlock-code`). O XP de cada planta é separado.
                                 """)
                         .contact(new Contact()
                                 .name("Time Backend Nexus Solutions")

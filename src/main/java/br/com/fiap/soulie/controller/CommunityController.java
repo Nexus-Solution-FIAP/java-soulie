@@ -86,13 +86,8 @@ public class CommunityController {
     @ApiResponse(responseCode = "200", description = "Jardim atual, com código de convite")
     @ApiResponse(responseCode = "204", description = "O usuário ainda não entrou em um jardim")
     public ResponseEntity<CommunityGardenResponse> garden(@Parameter(hidden = true) @AuthenticationPrincipal User user) {
-        return gardenService.findMine(user)
-                .map(garden -> ResponseEntity.ok(new CommunityGardenResponse(
-                        garden.getId(),
-                        garden.getName(),
-                        garden.getInviteCode(),
-                        (int) garden.getUsers().stream().filter(member -> member.getActive() == null || member.getActive()).count()
-                )))
+        return gardenService.current(user)
+                .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
@@ -105,7 +100,7 @@ public class CommunityController {
     @PostMapping("/garden/join")
     @Operation(summary = "Entra em um jardim pelo código")
     public ResponseEntity<CommunityGardenResponse> joinGarden(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                              @RequestBody JoinGardenRequest request) {
+                                                              @RequestBody(required = false) JoinGardenRequest request) {
         return ResponseEntity.ok(gardenService.join(user, request == null ? null : request.code()));
     }
 

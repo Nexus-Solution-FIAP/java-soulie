@@ -10,6 +10,7 @@ import br.com.fiap.soulie.domain.achievement.AchievementApiService;
 import br.com.fiap.soulie.domain.achievement.UserAchievementRepository;
 import br.com.fiap.soulie.domain.activity.ActivityApiService;
 import br.com.fiap.soulie.domain.garden.GardenService;
+import br.com.fiap.soulie.domain.plant.PlantCollectionService;
 import br.com.fiap.soulie.domain.soulie.SoulieApiService;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
@@ -40,6 +41,9 @@ public class ProfileApiService {
 
     @Autowired
     private ActivityApiService activityApiService;
+
+    @Autowired
+    private PlantCollectionService plantCollectionService;
 
     @Transactional
     public UserProfileResponse me(User user) {
@@ -118,7 +122,9 @@ public class ProfileApiService {
                         friends.xpToFirst(),
                         unlocked,
                         user.getCo2SavedKg(),
-                        user.getWaterSavedLiters()
+                        user.getWaterSavedLiters(),
+                        plantCollectionService.unlockedCount(user),
+                        plantCollectionService.totalCount()
                 ),
                 new UserSettingsResponse(notifications, digest, nudges, fullName)
         );

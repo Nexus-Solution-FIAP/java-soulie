@@ -1,6 +1,8 @@
 package br.com.fiap.soulie.controller;
 
+import br.com.fiap.soulie.api.dto.PlantItemResponse;
 import br.com.fiap.soulie.api.dto.SoulieResponse;
+import br.com.fiap.soulie.api.dto.UnlockPlantCodeRequest;
 import br.com.fiap.soulie.api.dto.UpdateSoulieRequest;
 import br.com.fiap.soulie.api.dto.WaterResponse;
 import br.com.fiap.soulie.domain.soulie.SoulieApiService;
@@ -13,6 +15,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping({"/api/v1/soulie", "/v1/soulie"})
@@ -40,5 +44,18 @@ public class SoulieApiController {
     @Operation(summary = "Rega o Soulie", description = "A primeira rega do dia conta 1 na sequência. Regar de novo no mesmo dia devolve a sequência atual sem somar.")
     public ResponseEntity<WaterResponse> water(@Parameter(hidden = true) @AuthenticationPrincipal User user) {
         return ResponseEntity.ok(soulieApiService.water(user));
+    }
+
+    @GetMapping("/plants")
+    @Operation(summary = "Coleção de plantas", description = "No cadastro o usuário escolhe 1 planta da flora brasileira. As outras liberam por missões, conquistas, nível máximo ou código secreto. O XP de cada planta é separado.")
+    public ResponseEntity<List<PlantItemResponse>> plants(@Parameter(hidden = true) @AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(soulieApiService.plants(user));
+    }
+
+    @PostMapping("/plants/unlock-code")
+    @Operation(summary = "Libera uma planta com código", description = "Exemplos: ROSAFLORA, ORQUIDEA26.")
+    public ResponseEntity<List<PlantItemResponse>> unlockCode(@Parameter(hidden = true) @AuthenticationPrincipal User user,
+                                                              @RequestBody UnlockPlantCodeRequest request) {
+        return ResponseEntity.ok(soulieApiService.redeemCode(user, request == null ? null : request.code()));
     }
 }

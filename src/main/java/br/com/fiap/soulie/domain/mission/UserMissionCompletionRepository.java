@@ -19,6 +19,8 @@ public interface UserMissionCompletionRepository extends JpaRepository<UserMissi
 
     List<UserMissionCompletion> findByUser_IdAndCompletedOnGreaterThanEqual(Long userId, LocalDate start);
 
+    long countByUser_Id(Long userId);
+
     long countByUser_IdAndMission_Tag(Long userId, String tag);
 
     @Query("""
