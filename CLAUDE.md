@@ -93,6 +93,33 @@ O app mobile do parceiro de equipe consome `/v1`. **Nenhum campo pode ser removi
 - As entidades têm `@Builder` para os testes montarem objetos. Ao adicionar campo obrigatório numa entidade, **verifique se os helpers de teste precisam preenchê-lo** (ex.: `Garden.inviteCode` é `nullable=false, unique=true`).
 - Rodar: `./mvnw clean verify`.
 
+### Regra: teste de integração antes de declarar qualquer coisa pronta
+
+**Toda funcionalidade ganha pelo menos um `@SpringBootTest` que chama o serviço
+pelo caminho real, fora de transação de teste — e ele roda antes de você dizer
+que está pronto.**
+
+Isto não é zelo: duas vezes neste projeto uma entrega foi declarada pronta com a
+suíte verde e estava **quebrada em toda chamada**.
+
+| O que quebrou | Por que a suíte não pegou |
+|---|---|
+| `GET /mission/{id}` e `GET /evidence/mission/{id}` davam 500 sempre | nenhum teste chamava o service fora de transação |
+| O pipeline de validação por IA: nenhuma mensagem era processada | nenhum teste exercitava o consumidor |
+
+As duas são a mesma falha. Com `open-in-view: false`, um método que não é
+`@Transactional` devolve a entidade **destacada**, e o primeiro acesso a uma
+associação `LAZY` estoura `LazyInitializationException`.
+
+**A armadilha que fecha o ciclo: `@DataJpaTest` esconde exatamente esse bug**,
+porque envolve cada teste numa transação e a entidade nunca fica destacada. Um
+teste escrito assim passa sem provar nada — já aconteceu aqui. Use
+`@DataJpaTest` para query de repository; para provar que um fluxo funciona,
+`@SpringBootTest` fora de transação.
+
+Quando houver suspeita de bug, escreva o teste para **falhar primeiro**, confirme
+o problema, e só então corrija.
+
 ## Cliente HTTP externo
 
 Há **um** jeito de chamar API de fora, o de `infra/push/ExpoPushService`: `RestClient` + `JdkClientHttpRequestFactory`, timeouts explícitos de connect e read, records aninhados para request/response, falha tratada e logada sem derrubar o fluxo. **Siga esse molde.** Não introduza `RestTemplate`, `WebClient` nem Feign.

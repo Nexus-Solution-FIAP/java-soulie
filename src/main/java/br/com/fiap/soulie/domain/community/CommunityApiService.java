@@ -15,6 +15,7 @@ import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.avatar.enums.FlowerType;
 import br.com.fiap.soulie.domain.garden.Garden;
 import br.com.fiap.soulie.domain.garden.GardenService;
+import br.com.fiap.soulie.domain.social.FollowService;
 import br.com.fiap.soulie.domain.mission.MissionImpact;
 import br.com.fiap.soulie.domain.mission.UserMissionCompletionRepository;
 import br.com.fiap.soulie.domain.soulie.SoulieLevel;
@@ -63,6 +64,9 @@ public class CommunityApiService {
 
     @Autowired
     private GardenService gardenService;
+
+    @Autowired
+    private FollowService followService;
 
     @Autowired
     private UserMissionCompletionRepository completionRepository;
@@ -162,12 +166,20 @@ public class CommunityApiService {
         if (targetId == null || targetId.equals(current.getId())) {
             throw new ValidationException("Escolha um amigo do jardim");
         }
-        Garden garden = gardenService.findMine(current)
-                .orElseThrow(() -> new ValidationException("Entre em um jardim para cutucar um amigo"));
-        boolean member = garden.getUsers().stream()
-                .anyMatch(user -> user.getId().equals(targetId) && (user.getActive() == null || user.getActive()));
-        if (!member) {
-            throw new ValidationException("Essa pessoa não está no seu jardim");
+        // Mesmo jardim OU amizade mútua. Amplia sem remover comportamento: quem
+        // já cutucava pelo jardim continua cutucando. A amizade entra como
+        // segundo caminho para quem não divide jardim — é o que o grafo social
+        // passa a permitir.
+        boolean mesmoJardim = gardenService.findMine(current)
+                .map(garden -> garden.getUsers().stream()
+                        .anyMatch(user -> user.getId().equals(targetId)
+                                && (user.getActive() == null || user.getActive())))
+                .orElse(false);
+        boolean amigos = followService.saoAmigos(current.getId(), targetId);
+
+        if (!mesmoJardim && !amigos) {
+            throw new ValidationException(
+                    "Vocês precisam dividir o jardim ou seguir um ao outro para cutucar");
         }
         User target = userRepository.findById(targetId)
                 .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));

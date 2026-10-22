@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
     Page<User> findAllByActiveTrue(Pageable pageable);
@@ -21,6 +22,12 @@ public interface UserRepository extends JpaRepository<User, Long> {
     boolean existsByEmail(String email);
 
     User findByEmail(String email);
+
+    /** Busca por handle exato, usada pelo grafo social. Só contas ativas. */
+    Optional<User> findByHandleAndActiveTrue(String handle);
+
+    /** Usada pelos validators de interação vindos do soulie-soul-up. */
+    boolean existsByIdAndActiveTrue(Long id);
 
     List<User> findAllByExpoPushToken(String expoPushToken);
 
