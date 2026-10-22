@@ -25,6 +25,16 @@ spring:
         # Necessário: "level" (Avatar) e "date" (HistoryPoints) são palavras
         # reservadas no H2. Sem isto o schema nem é criado.
         globally_quoted_identifiers: true
+  rabbitmq:
+    host: "localhost"
+    port: 5672
+    username: "guest"
+    password: "guest"
+    listener:
+      simple:
+        # Não há broker nos testes. Sem isto o container de listener fica
+        # tentando conectar em laço e enche o log de erro.
+        auto-startup: false
   servlet:
     multipart:
       max-file-size: 10MB
@@ -52,3 +62,8 @@ soulie:
     access-key: "test"
     secret-key: "test"
     public-base-url: ""
+  ai:
+    url: ""
+    api-key: ""
+    webhook-enabled: false
+    webhook-secret: "segredo-de-teste-do-webhook-com-tamanho-suficiente"

@@ -89,7 +89,8 @@ class EvidenceServiceTest {
 
     @Test
     void evidencesByMissionReturnsResultOfEachEvidence() {
-        var evidence = new Evidence(9L, user, mission, "img");
+        var evidence = Evidence.builder()
+                .id(9L).user(user).mission(mission).image("https://img/foto.png").build();
         when(missionService.findMission(3L)).thenReturn(mission);
         when(evidenceRepository.findAllByMissionId(3L)).thenReturn(List.of(evidence));
         when(validationService.resultOf(9L)).thenReturn(ResultValidation.APPROVED);

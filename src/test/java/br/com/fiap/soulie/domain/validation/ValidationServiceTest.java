@@ -7,11 +7,14 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
+import br.com.fiap.soulie.infra.messaging.ValidationRequestedEvent;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -19,6 +22,9 @@ class ValidationServiceTest {
 
     @Mock
     private ValidationRepository validationRepository;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @InjectMocks
     private ValidationService service;
@@ -32,12 +38,17 @@ class ValidationServiceTest {
 
         assertThat(validation.getResultValidation()).isEqualTo(ResultValidation.PENDING);
         assertThat(validation.getEvidence()).isSameAs(evidence);
+
+        // O pedido de analise e disparado como evento, nao publicado direto na
+        // fila: quem fala com o RabbitMQ so age depois do commit, para o worker
+        // nao consumir uma validacao que ainda nao existe no banco.
+        verify(eventPublisher).publishEvent(any(ValidationRequestedEvent.class));
     }
 
     @Test
     void resultOfReturnsWhatTheAiWrote() {
         when(validationRepository.findByEvidenceId(1L))
-                .thenReturn(Optional.of(new Validation(1L, null, ResultValidation.REJECTED)));
+                .thenReturn(Optional.of(Validation.builder().id(1L).resultValidation(ResultValidation.REJECTED).build()));
 
         assertThat(service.resultOf(1L)).isEqualTo(ResultValidation.REJECTED);
     }

@@ -9,6 +9,11 @@ import br.com.fiap.soulie.domain.achievement.AchievementApiService;
 import br.com.fiap.soulie.domain.activity.UserActivity;
 import br.com.fiap.soulie.domain.activity.UserActivityRepository;
 import br.com.fiap.soulie.domain.avatar.Avatar;
+import br.com.fiap.soulie.domain.evidence.EvidenceService;
+import br.com.fiap.soulie.domain.validation.Validation;
+import br.com.fiap.soulie.domain.validation.ValidationService;
+import br.com.fiap.soulie.infra.exception.BusinessException;
+import br.com.fiap.soulie.infra.messaging.ValidationPublisher;
 import br.com.fiap.soulie.domain.soulie.SoulieApiService;
 import br.com.fiap.soulie.domain.user.User;
 import jakarta.persistence.EntityNotFoundException;
@@ -45,6 +50,17 @@ public class MissionApiService {
     @Lazy
     private SoulieApiService soulieApiService;
 
+    @Autowired
+    @Lazy
+    private EvidenceService evidenceService;
+
+    @Autowired
+    private ValidationPublisher validationPublisher;
+
+    @Autowired
+    @Lazy
+    private ValidationService validationService;
+
     @Transactional(readOnly = true)
     public List<DailyMissionResponse> daily(User user) {
         return list(user);
@@ -60,6 +76,25 @@ public class MissionApiService {
                 .toList();
     }
 
+    /**
+     * Recebe a foto da missão e a coloca na fila de validação.
+     *
+     * <p><b>Mudança central da Fase 4.</b> A versão anterior guardava apenas
+     * {@code photo.getOriginalFilename()}, <b>descartava os bytes</b> e creditava
+     * o XP na hora — inclusive quando nenhuma foto era enviada, porque o
+     * parâmetro era opcional. O campo {@code aiDetections} da resposta vinha de
+     * uma tabela de frases fixas escolhidas pela tag da missão, apresentada ao
+     * usuário como análise de imagem.
+     *
+     * <p>Agora: a imagem é validada por magic bytes, guardada no bucket com
+     * chave gerada pelo servidor, registrada como {@code Evidence} com uma
+     * {@code Validation} PENDING, e publicada na fila. O XP só é creditado
+     * quando a IA aprovar, em {@code ValidationOutcomeService}.
+     *
+     * <p>A resposta mantém todos os campos que o app já consome; entram
+     * {@code validationId} e {@code status}. Um cliente antigo lê
+     * {@code xpGained: 0} e não estoura.
+     */
     @Transactional
     public MissionValidationResponse validate(User user, Long missionId, MultipartFile photo) {
         DailyMission mission = dailyMissionRepository.findById(missionId)
@@ -67,9 +102,35 @@ public class MissionApiService {
         if (alreadyDoneInPeriod(user.getId(), mission)) {
             throw new ValidationException(MissionPeriodWindow.alreadyDoneMessage(mission.getPeriod()));
         }
-        String imageName = photo == null || photo.isEmpty() ? null : photo.getOriginalFilename();
-        Reward reward = reward(user, mission, imageName, mission.getEmoji(), mission.getName() + " realizada");
-        return validationResponse(user, mission, reward.unlocked());
+        if (photo == null || photo.isEmpty()) {
+            throw new ValidationException("Envie uma foto para comprovar a missão");
+        }
+
+        // Falha cedo e com mensagem clara se a fila estiver fora: melhor 503 que
+        // um 202 prometendo uma análise que nunca vai acontecer.
+        validationPublisher.exigirFilaDisponivel();
+
+        var registrada = evidenceService.submitForDailyMission(user, mission, photo);
+        var validation = registrada.validation();
+
+        return MissionValidationResponse.pendente(validation.getId(), mission.getId());
+    }
+
+    /**
+     * Credita a recompensa depois que a IA aprovou a evidência.
+     *
+     * <p>Chamado pelo {@code ValidationOutcomeService}, fora da requisição
+     * original. Reaproveita o mesmo {@code reward(...)} do fluxo de atividade,
+     * para não existirem duas regras de recompensa divergindo com o tempo.
+     */
+    @Transactional
+    public void rewardAprovada(User user, DailyMission mission) {
+        if (alreadyDoneInPeriod(user.getId(), mission)) {
+            // Entre o envio e a aprovação o usuário pode ter concluído a mesma
+            // missão por outro caminho. Creditar de novo seria XP em dobro.
+            return;
+        }
+        reward(user, mission, null, mission.getEmoji(), mission.getName() + " realizada");
     }
 
     @Transactional
@@ -109,7 +170,19 @@ public class MissionApiService {
         return new Reward(activity, unlocked);
     }
 
-    private MissionValidationResponse validationResponse(User user, DailyMission mission, List<Achievement> unlocked) {
+    /**
+     * Monta a resposta de consulta de uma validação já analisada.
+     *
+     * <p>As detecções vêm da {@code Validation}, isto é, do que a IA de fato
+     * reconheceu. Antes vinham do método {@code detections(DailyMission)}, uma
+     * tabela de frases fixas escolhidas por palavra-chave na tag da missão —
+     * que nunca olhava a foto e respondia igual mesmo sem foto nenhuma. Esse
+     * método foi removido.
+     */
+    private MissionValidationResponse validationResponse(User user,
+                                                         DailyMission mission,
+                                                         List<Achievement> unlocked,
+                                                         Validation validation) {
         LocalDate today = LocalDate.now();
         List<UserMissionCompletion> completions = completionRepository
                 .findByUser_IdAndCompletedOnGreaterThanEqual(user.getId(), MissionPeriodWindow.start(MissionPeriod.YEARLY, today));
@@ -128,14 +201,17 @@ public class MissionApiService {
                 unlocked.get(0).getDescription(),
                 unlocked.get(0).getIcon()
         );
+        boolean aprovada = validation.isApproved();
         return new MissionValidationResponse(
-                true,
-                mission.getXp(),
+                aprovada,
+                aprovada ? mission.getXp() : 0,
                 mission.getId(),
-                detections(mission),
-                mission.getCo2SavedKg(),
+                validation.detectionList(),
+                aprovada ? mission.getCo2SavedKg() : 0,
                 badge,
-                next
+                next,
+                validation.getId(),
+                validation.getResultValidation().name()
         );
     }
 
@@ -178,26 +254,25 @@ public class MissionApiService {
                         && MissionPeriodWindow.contains(mission.getPeriod(), today, completion.getCompletedOn()));
     }
 
-    private List<String> detections(DailyMission mission) {
-        String tag = mission.getTag().toLowerCase(Locale.ROOT);
-        String name = mission.getName().toLowerCase(Locale.ROOT);
-        List<String> lines;
-        if (tag.contains("recicla") || name.contains("recicla")) {
-            lines = List.of("Lixeiras de coleta seletiva identificadas", "Descarte correto de resíduos recicláveis");
-        } else if (tag.contains("mobil") || name.contains("transporte") || name.contains("bicicleta")) {
-            lines = List.of("Transporte coletivo sustentável em uso", "Deslocamento urbano de baixo carbono verificado");
-        } else if (tag.contains("água") || name.contains("água") || name.contains("banho")) {
-            lines = List.of("Controle consciente de fluxo de água detectado", "Redução de desperdício hídrico constatada");
-        } else if (tag.contains("consumo") || name.contains("descart")) {
-            lines = List.of("Item ecológico reutilizável reconhecido", "Prevenção de embalagens plásticas descartáveis");
-        } else if (tag.contains("energia") || name.contains("luz") || name.contains("standby")) {
-            lines = List.of("Equipamentos ou iluminação em modo eco", "Otimização de eficiência energética validada");
-        } else if (tag.contains("natureza") || tag.contains("resíduo") || name.contains("planta") || name.contains("compost")) {
-            lines = List.of("Vegetação e manejo do solo identificados", "Contribuição para absorção natural de carbono");
-        } else {
-            lines = List.of("Ação sustentável reconhecida", "Evidência ecológica registrada");
+    /**
+     * Estado atual de uma validação, para o app consultar depois do 202.
+     *
+     * <p>Confere a posse: a validação tem de ser de uma evidência do próprio
+     * usuário, senão qualquer um varreria ids alheios.
+     */
+    @Transactional(readOnly = true)
+    public MissionValidationResponse statusDaValidacao(User user, Long validationId) {
+        Validation validation = validationService.findById(validationId);
+        var evidence = validation.getEvidence();
+
+        if (evidence.getUser() == null || !evidence.getUser().getId().equals(user.getId())) {
+            throw BusinessException.acessoNegado("Esta validação não é sua");
         }
-        return List.of(lines.get(0), lines.get(1), "Comprovação registrada no Soulie");
+        if (evidence.getDailyMission() == null) {
+            throw new EntityNotFoundException("Validação não pertence a uma missão do app");
+        }
+
+        return validationResponse(user, evidence.getDailyMission(), List.of(), validation);
     }
 
     private record Reward(UserActivity activity, List<Achievement> unlocked) {

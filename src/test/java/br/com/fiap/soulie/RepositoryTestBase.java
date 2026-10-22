@@ -64,11 +64,21 @@ public abstract class RepositoryTestBase {
     }
 
     protected Evidence persistEvidence(Mission mission, User user) {
-        return em.persist(new Evidence(null, user, mission, "https://img/foto.png"));
+        return em.persist(Evidence.builder()
+                .user(user)
+                .mission(mission)
+                .image("https://img/foto.png")
+                .imageUrl("https://img/foto.png")
+                .submittedAt(java.time.LocalDateTime.now())
+                .build());
     }
 
     protected Validation persistValidation(Evidence evidence, ResultValidation result) {
-        return em.persist(new Validation(null, evidence, result));
+        return em.persist(Validation.builder()
+                .evidence(evidence)
+                .resultValidation(result)
+                .requestedAt(java.time.LocalDateTime.now())
+                .build());
     }
 
     protected RewardCatalog persistRewardCatalog(String benefits, int cost) {

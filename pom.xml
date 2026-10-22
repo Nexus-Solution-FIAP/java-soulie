@@ -51,6 +51,24 @@
     </dependencyManagement>
 
     <dependencies>
+        <!--
+            RabbitMQ. No Spring Boot 4.1 o artefato correto ainda e
+            spring-boot-starter-amqp: o rename para spring-boot-starter-rabbitmq
+            entrou no 4.1.0-M3, foi REVERTIDO no M4 e esta reagendado para o 4.2.
+            Conferido: o -amqp existe no Central para a 4.1.1 e o -rabbitmq da 404.
+            A configuracao segue no namespace spring.rabbitmq.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Storage das imagens de evidencia: bucket do Railway, compativel com S3. -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>

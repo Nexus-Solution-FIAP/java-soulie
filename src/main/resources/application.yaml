@@ -25,6 +25,27 @@ spring:
         # para varrer a base inteira numa requisição.
         max-page-size: 50
         default-page-size: 20
+  rabbitmq:
+    host: "${RABBITMQ_HOST}"
+    port: "${RABBITMQ_PORT:5672}"
+    username: "${RABBITMQ_USER}"
+    password: "${RABBITMQ_PASSWORD}"
+    virtual-host: "${RABBITMQ_VHOST:/}"
+    listener:
+      simple:
+        # Tentativas no proprio consumidor antes de a mensagem ir para a DLQ.
+        # Sem isto, a mensagem volta para a fila em laco infinito e ocupa o
+        # worker para sempre.
+        retry:
+          enabled: true
+          max-attempts: 4
+          initial-interval: 2s
+          multiplier: 3
+          max-interval: 1m
+        # Com retry esgotado, rejeita SEM reenfileirar: e isso que faz a
+        # mensagem cair na dead-letter exchange em vez de voltar para o fim da
+        # fila de novo.
+        default-requeue-rejected: false
   servlet:
     multipart:
       max-file-size: 10MB
@@ -66,3 +87,23 @@ soulie:
     presigned-url-ttl: "${S3_PRESIGNED_TTL:PT15M}"
     max-bytes: 10485760
 
+  ai:
+    # A URL vem SÓ daqui, nunca de entrada do usuário: o worker faz uma
+    # requisição de saída para este endereço, e aceitar valor do usuário
+    # transformaria o worker num proxy de SSRF contra a rede interna.
+    url: "${AI_VALIDATION_URL:}"
+    api-key: "${AI_VALIDATION_API_KEY:}"
+    # PRESIGNED_URL manda um link temporário; BYTES manda a imagem em base64.
+    delivery-mode: "${AI_DELIVERY_MODE:PRESIGNED_URL}"
+    connect-timeout: PT5S
+    # Análise de imagem é lenta. Mas o limite tem de existir: sem ele, um worker
+    # fica preso para sempre numa IA que não responde.
+    read-timeout: "${AI_READ_TIMEOUT:PT30S}"
+    mode: "${VALIDATION_MODE:ASYNC}"
+    # Desligado por padrão. Só ligue se a IA do parceiro responder depois, em
+    # vez de na própria chamada — um endpoint público a mais que ninguém usa é
+    # só superfície de ataque.
+    webhook-enabled: "${AI_WEBHOOK_ENABLED:false}"
+    webhook-secret: "${AI_WEBHOOK_SECRET:}"
+    webhook-tolerance: PT5M
+    callback-url: "${AI_CALLBACK_URL:}"
