@@ -91,6 +91,16 @@ public class SecurityConfig {
                     req.requestMatchers(HttpMethod.POST, "/login", "/user").permitAll();
                     req.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
 
+                    // Callback da IA de validação. Não passa por JWT porque quem
+                    // chama é um serviço, não um usuário — a autenticação dele é
+                    // a assinatura HMAC conferida no próprio controller, com
+                    // janela de timestamp contra replay.
+                    //
+                    // O controller só existe quando soulie.ai.webhook-enabled é
+                    // true (@ConditionalOnProperty), então com o webhook
+                    // desligado esta rota simplesmente não existe e responde 404.
+                    req.requestMatchers(HttpMethod.POST, "/webhooks/validations").permitAll();
+
                     // Escrita no catalogo compartilhado de acoes e operacao
                     // administrativa. Antes era aberta a qualquer autenticado: dava
                     // para injetar conteudo no catalogo de todos e, pior, definir

@@ -45,7 +45,12 @@ public class SecurityFilter extends OncePerRequestFilter {
             "/v3/api-docs/**",
             "/swagger-ui.html",
             "/swagger-ui/**",
-            "/error"
+            "/error",
+            // Callback da IA: a autenticacao dele e a assinatura HMAC, conferida
+            // no proprio controller. Se o filtro rodasse aqui, um cabecalho
+            // Authorization obsoleto na chamada do parceiro derrubaria o webhook
+            // com 401 antes de a assinatura sequer ser olhada.
+            "/webhooks/**"
     );
 
     private final AntPathMatcher matcher = new AntPathMatcher();
