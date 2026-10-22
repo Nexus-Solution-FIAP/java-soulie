@@ -9,7 +9,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -18,6 +21,7 @@ import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -82,10 +86,21 @@ public class SecurityFilter extends OncePerRequestFilter {
                 SecurityContextHolder.clearContext();
                 entryPoint.commence(request, response, exception);
                 return;
+            } catch (DataAccessException exception) {
+                // Banco fora do ar, pool esgotado. NÃO é falha de credencial, e
+                // responder 401 aqui seria pior que o 500 original: o cliente
+                // interpreta como sessão expirada, descarta o token e manda o
+                // usuário fazer login de novo, enquanto o alerta de 5xx nunca
+                // dispara e a indisponibilidade passa despercebida.
+                var correlationId = UUID.randomUUID().toString();
+                log.error("Banco indisponível ao autenticar [{}]", correlationId, exception);
+                SecurityContextHolder.clearContext();
+                responderIndisponivel(response, correlationId);
+                return;
             } catch (RuntimeException exception) {
-                // Qualquer outra falha — banco fora do ar no findByEmail, erro de
-                // configuração do algoritmo — também escaparia do filtro e cairia
-                // no /error do container, onde a mensagem crua pode vazar.
+                // O resto — erro de configuração do algoritmo, por exemplo —
+                // também escaparia do filtro e cairia no /error do container,
+                // onde a mensagem crua pode vazar.
                 var correlationId = UUID.randomUUID().toString();
                 log.error("Falha inesperada ao autenticar [{}]", correlationId, exception);
                 SecurityContextHolder.clearContext();
@@ -96,6 +111,19 @@ public class SecurityFilter extends OncePerRequestFilter {
         }
 
         filterChain.doFilter(request, response);
+    }
+
+    private void responderIndisponivel(HttpServletResponse response, String correlationId) throws IOException {
+        if (response.isCommitted()) {
+            return;
+        }
+        byte[] corpo = ("Serviço temporariamente indisponível. Referência: " + correlationId)
+                .getBytes(StandardCharsets.UTF_8);
+        response.setStatus(HttpStatus.SERVICE_UNAVAILABLE.value());
+        response.setContentType(MediaType.TEXT_PLAIN_VALUE);
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentLength(corpo.length);
+        response.getOutputStream().write(corpo);
     }
 
     private void autenticar(String tokenJWT) {

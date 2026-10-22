@@ -8,6 +8,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AccountStatusException;
@@ -112,7 +113,15 @@ public class ErrorHandler extends ResponseEntityExceptionHandler {
      */
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<String> treatmentDataIntegrity(DataIntegrityViolationException ex) {
-        log.warn("Violação de integridade: {}", ex.getMostSpecificCause().getMessage());
+        // Loga só o nome da restrição violada. A versão anterior usava
+        // getMostSpecificCause().getMessage(), que no PostgreSQL vem com o valor
+        // duplicado: "Detail: Key (email)=(pessoa@exemplo.com) already exists."
+        // Ou seja, todo cadastro duplicado gravava o e-mail de uma pessoa real no
+        // log do servidor.
+        String restricao = ex.getCause() instanceof ConstraintViolationException violacao
+                ? violacao.getConstraintName()
+                : ex.getClass().getSimpleName();
+        log.warn("Violação de integridade: {}", restricao);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body("Não foi possível concluir: já existe um registro com esses dados.");
     }
