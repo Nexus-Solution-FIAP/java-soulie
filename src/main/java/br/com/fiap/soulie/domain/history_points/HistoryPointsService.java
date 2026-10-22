@@ -16,6 +16,7 @@ public class HistoryPointsService {
     private HistoryPointsRepository historyPointsRepository;
 
     // Get
+    @Transactional(readOnly = true)
     public List<HistoryPointsResponse> myHistory(Long userId) {
         return historyPointsRepository.findAllByUserIdOrderByDateDesc(userId).stream()
                 .map(HistoryPointsResponse::new)

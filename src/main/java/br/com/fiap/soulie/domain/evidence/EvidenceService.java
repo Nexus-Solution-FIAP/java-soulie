@@ -35,6 +35,14 @@ public class EvidenceService {
     private MissionOwnerValidator ownerValidator;
 
     // Get
+    // @Transactional(readOnly = true) e obrigatorio aqui, nao opcional.
+    // O projeto usa spring.jpa.open-in-view: false, entao a sessao do Hibernate
+    // fecha quando o metodo do repository retorna. Sem a transacao no service, a
+    // entidade volta DESTACADA e o primeiro acesso a uma associacao LAZY estoura
+    // LazyInitializationException — 500 na rota inteira. Havia um teste
+    // (MissionLazyLoadingTest) provando que GET /mission/{id} e
+    // GET /evidence/mission/{id} estavam quebrados por isso.
+    @Transactional(readOnly = true)
     public List<EvidenceResponse> evidencesByMission(Long missionId, Long userId) {
         var mission = missionService.findMission(missionId);
         ownerValidator.validate(mission, userId);

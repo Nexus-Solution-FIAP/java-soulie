@@ -49,10 +49,19 @@ public class MissionService {
     private MissionOwnerValidator ownerValidator;
 
     // Get
+    // @Transactional(readOnly = true) e obrigatorio aqui, nao opcional.
+    // O projeto usa spring.jpa.open-in-view: false, entao a sessao do Hibernate
+    // fecha quando o metodo do repository retorna. Sem a transacao no service, a
+    // entidade volta DESTACADA e o primeiro acesso a uma associacao LAZY estoura
+    // LazyInitializationException — 500 na rota inteira. Havia um teste
+    // (MissionLazyLoadingTest) provando que GET /mission/{id} e
+    // GET /evidence/mission/{id} estavam quebrados por isso.
+    @Transactional(readOnly = true)
     public List<MissionResponse> myMissions(Long userId) {
         return missionRepository.findAllByAvatarUserId(userId).stream().map(mapper::toMissionResponse).toList();
     }
 
+    @Transactional(readOnly = true)
     public MissionResponse missionDetails(Long missionId, Long userId) {
         var mission = findMission(missionId);
         ownerValidator.validate(mission, userId);
@@ -89,6 +98,7 @@ public class MissionService {
         return avatarMapper.toDetail(mission.getAvatar());
     }
 
+    @Transactional(readOnly = true)
     public Mission findMission(Long missionId) {
         return missionRepository.findById(missionId)
                 .orElseThrow(() -> new EntityNotFoundException("Missão não encontrada"));
