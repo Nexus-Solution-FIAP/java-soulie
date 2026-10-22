@@ -86,12 +86,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(req -> {
                     // Rotas públicas.
                     //
-                    // PENDÊNCIA CONHECIDA: nenhuma delas tem rate limit hoje. Sem
-                    // teto, POST /login é força bruta de senha e POST /user é
-                    // criação em massa de conta — que é justamente o insumo de
-                    // qualquer ataque que precise de "algum login válido".
-                    // O limite entra na Fase 6, com Bucket4j e Redis. Até lá, o
-                    // Cloudflare na frente é a única barreira.
+                    // As duas têm rate limit, aplicado pelo rateLimitFilter
+                    // registrado no fim deste método: sem teto, POST /login é
+                    // força bruta de senha e POST /user é criação em massa de
+                    // conta — que é justamente o insumo de qualquer ataque que
+                    // precise de "algum login válido".
                     req.requestMatchers(HttpMethod.POST, "/login", "/user").permitAll();
                     req.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
 

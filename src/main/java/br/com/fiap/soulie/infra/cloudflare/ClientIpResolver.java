@@ -10,19 +10,25 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Descobre o IP real de quem chamou, quando a API está atrás do Cloudflare.
  *
- * <p><b>Sem isto, o rate limit por IP é inútil:</b> atrás de um proxy,
- * {@code request.getRemoteAddr()} devolve o IP do <i>proxy</i>, igual para todo
- * mundo — então o limite estrangularia todos os usuários no mesmo balde.
+ * <p><b>Sem isto, o rate limit por IP é inútil:</b> atrás de um proxy, o
+ * endereço da conexão é o do <i>proxy</i>, igual para todo mundo — então o
+ * limite estrangularia todos os usuários no mesmo balde.
  *
  * <p><b>E aceitar o cabeçalho sem conferir a origem é pior ainda:</b> aí
  * qualquer cliente manda um {@code CF-Connecting-IP} diferente a cada
  * requisição e o limite vira decoração. Por isso o cabeçalho só é lido quando a
- * <b>conexão</b> vem de uma faixa do Cloudflare — e essa verificação usa o IP do
- * socket, que o cliente não controla.
+ * <b>conexão</b> vem de uma faixa do Cloudflare.
+ *
+ * <p>Essa verificação usa o endereço guardado pelo {@link SocketAddressFilter},
+ * e <b>não</b> {@code getRemoteAddr()}. A diferença é o bypass que existiu aqui:
+ * com o {@code ForwardedHeaderFilter} embrulhando a requisição,
+ * {@code getRemoteAddr()} passa a devolver o que o cliente escreveu em
+ * {@code X-Forwarded-For}. O atributo é gravado antes de qualquer embrulho.
  */
 @Component
 public class ClientIpResolver {
@@ -30,6 +36,15 @@ public class ClientIpResolver {
     private static final Logger log = LoggerFactory.getLogger(ClientIpResolver.class);
 
     private static final String HEADER_CLOUDFLARE = "CF-Connecting-IP";
+
+    /**
+     * IPv4 em quatro octetos decimais.
+     *
+     * <p>Usado para separar literal de IP de <b>nome de domínio</b>. Ver
+     * {@link #ehLiteralDeIp(String)}.
+     */
+    private static final Pattern IPV4 = Pattern.compile(
+            "(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(\\.(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}");
 
     /**
      * Faixas publicadas pelo Cloudflare (https://www.cloudflare.com/ips/).
@@ -55,9 +70,18 @@ public class ClientIpResolver {
 
     @PostConstruct
     void carregarFaixas() {
-        List<String> origem = properties.getTrustedIps() == null || properties.getTrustedIps().isEmpty()
-                ? FAIXAS_CLOUDFLARE
-                : properties.getTrustedIps();
+        List<String> configuradas = properties.getTrustedIps() == null
+                ? List.of()
+                : properties.getTrustedIps().stream()
+                        // Elemento branco não pode chegar ao parse:
+                        // InetAddress.getByName("") devolve LOOPBACK, então uma
+                        // vírgula sobrando em CLOUDFLARE_TRUSTED_IPS trocaria as
+                        // faixas do Cloudflare por 127.0.0.1 — em silêncio, e
+                        // com o boot verde.
+                        .filter(cidr -> cidr != null && !cidr.isBlank())
+                        .toList();
+
+        List<String> origem = configuradas.isEmpty() ? FAIXAS_CLOUDFLARE : configuradas;
 
         for (String cidr : origem) {
             try {
@@ -69,6 +93,17 @@ public class ClientIpResolver {
                 log.warn("Faixa de IP confiável inválida e ignorada: {}", cidr);
             }
         }
+
+        if (properties.isEnabled() && faixasConfiaveis.isEmpty()) {
+            // Mesmo raciocínio do validarCors do SecurityConfig: configuração
+            // que não faz o que promete recusa a subida, em vez de rodar
+            // parecendo protegida. Aqui o efeito seria pior que inútil —
+            // ninguém seria confiável, todos cairiam no IP do proxy, e o limite
+            // estrangularia a base inteira num balde só.
+            throw new IllegalStateException(
+                    "soulie.cloudflare.enabled=true mas nenhuma faixa confiável válida foi carregada. "
+                            + "Revise CLOUDFLARE_TRUSTED_IPS.");
+        }
         if (properties.isEnabled()) {
             log.info("Confiança em {} ativada para {} faixas", HEADER_CLOUDFLARE, faixasConfiaveis.size());
         }
@@ -78,10 +113,10 @@ public class ClientIpResolver {
      * O IP do cliente.
      *
      * @return o valor de {@code CF-Connecting-IP} quando a conexão vem de faixa
-     *         confiável; caso contrário o IP do socket, que não é falsificável
+     *         confiável; caso contrário o endereço real da conexão
      */
     public String resolver(HttpServletRequest request) {
-        String ipDoSocket = request.getRemoteAddr();
+        String ipDoSocket = SocketAddressFilter.socketIpDe(request);
 
         if (!properties.isEnabled()) {
             return ipDoSocket;
@@ -92,18 +127,29 @@ public class ClientIpResolver {
             return ipDoSocket;
         }
 
-        if (!vemDoCloudflare(ipDoSocket)) {
+        if (!vemDeProxyConfiavel(ipDoSocket)) {
             // Alguém mandou o cabeçalho sem vir pelo proxy. Não é erro de
             // configuração: é tentativa de burlar o limite.
-            log.debug("CF-Connecting-IP recebido de origem não confiável ({}), ignorado", ipDoSocket);
+            log.debug("CF-Connecting-IP recebido de origem não confiável, ignorado");
             return ipDoSocket;
         }
 
-        return cabecalho.trim();
+        String informado = cabecalho.trim();
+        if (!ehLiteralDeIp(informado)) {
+            // O cabeçalho vem do proxy, mas o conteúdo dele vem do cliente. Sem
+            // esta checagem, qualquer string entraria na chave do contador — e,
+            // pior, seria resolvida como nome de domínio mais abaixo.
+            log.debug("CF-Connecting-IP com valor que não é endereço IP, ignorado");
+            return ipDoSocket;
+        }
+        return informado;
     }
 
     /** True se a conexão veio de uma das faixas confiáveis. */
-    public boolean vemDoCloudflare(String ip) {
+    public boolean vemDeProxyConfiavel(String ip) {
+        if (!ehLiteralDeIp(ip)) {
+            return false;
+        }
         try {
             InetAddress endereco = InetAddress.getByName(ip);
             return faixasConfiaveis.stream().anyMatch(faixa -> faixa.contem(endereco));
@@ -112,16 +158,53 @@ public class ClientIpResolver {
         }
     }
 
+    /**
+     * É um endereço IP escrito por extenso, e não um nome?
+     *
+     * <p>Esta checagem existe porque {@code InetAddress.getByName} <b>resolve
+     * nome de domínio</b>, não só literal. Sem ela, o valor que chega num
+     * cabeçalho podia virar uma consulta DNS <b>na thread da requisição e sem
+     * timeout</b>, com três consequências: quem controla um domínio o aponta
+     * para um IP de faixa Cloudflare e passa a ser "confiável"; um rótulo
+     * aleatório por requisição ignora o cache e pendura threads até esgotar o
+     * pool; e o servidor passa a consultar domínios escolhidos por terceiro.
+     *
+     * <p>Um nome nunca contém {@code ':'}, então a presença de dois-pontos já
+     * separa IPv6 de nome. O resto tem de casar o IPv4 por extenso.
+     */
+    private static boolean ehLiteralDeIp(String valor) {
+        if (valor == null || valor.isBlank()) {
+            return false;
+        }
+        String limpo = valor.trim();
+        if (limpo.indexOf(':') >= 0) {
+            return true;
+        }
+        return IPV4.matcher(limpo).matches();
+    }
+
     /** Faixa CIDR, comparada bit a bit — serve para IPv4 e IPv6. */
     record FaixaCidr(byte[] base, int bitsDePrefixo) {
 
         static FaixaCidr parse(String cidr) throws UnknownHostException {
             String[] partes = cidr.split("/");
             InetAddress endereco = InetAddress.getByName(partes[0]);
+            byte[] base = endereco.getAddress();
             int bits = partes.length > 1
                     ? Integer.parseInt(partes[1])
-                    : endereco.getAddress().length * 8;
-            return new FaixaCidr(endereco.getAddress(), bits);
+                    : base.length * 8;
+
+            // Prefixo fora da faixa tem de ser recusado AQUI, para cair no catch
+            // de quem chama e a faixa ser ignorada. Antes isto passava, porque
+            // Integer.parseInt("33") não falha — e o estrago aparecia depois:
+            // /33 estourava ArrayIndexOutOfBounds em toda requisição daquele IP,
+            // com o boot verde, e /-1 era pior porque NÃO falhava: a máscara
+            // degenerava e metade do espaço IPv4 passava a ser "Cloudflare".
+            if (bits < 0 || bits > base.length * 8) {
+                throw new IllegalArgumentException(
+                        "Prefixo CIDR fora da faixa para este endereço: " + cidr);
+            }
+            return new FaixaCidr(base, bits);
         }
 
         boolean contem(InetAddress candidato) {

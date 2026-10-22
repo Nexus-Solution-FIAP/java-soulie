@@ -31,7 +31,21 @@ public class RateLimitProperties {
 
     private Duration defaultWindow = Duration.ofMinutes(1);
 
+    /**
+     * Quantos contadores o modo em memoria guarda, no maximo.
+     *
+     * <p>Existe porque sem teto o proprio limitador derruba o processo: a chave
+     * inclui o IP de quem chama, e um mapa que nunca remove entrada cresce com
+     * cada origem distinta da internet ate dar OutOfMemoryError — e o reinicio
+     * por OOM zera todos os contadores, o que e mais um reset de graca para
+     * quem estava sendo barrado.
+     */
+    private int maxInMemoryEntries = 100_000;
+
     private List<Regra> rules = new ArrayList<>();
+
+    public int getMaxInMemoryEntries() { return maxInMemoryEntries; }
+    public void setMaxInMemoryEntries(int maxInMemoryEntries) { this.maxInMemoryEntries = maxInMemoryEntries; }
 
     public boolean isEnabled() { return enabled; }
     public void setEnabled(boolean enabled) { this.enabled = enabled; }

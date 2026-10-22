@@ -88,12 +88,16 @@ class RateLimitIntegrationTest {
     }
 
     @Test
-    @DisplayName("BYPASS: CF-Connecting-IP forjado não zera o contador")
-    void cabecalhoForjadoNaoZeraContador() throws Exception {
-        // A confiança no Cloudflare está DESLIGADA no perfil de teste, que é o
-        // padrão. Mesmo assim, este é o teste que importa: se o resolvedor
-        // lesse o cabeçalho sem conferir a origem, cada requisição com um IP
-        // diferente teria contador próprio e o limite nunca seria atingido.
+    @DisplayName("Com a confianca desligada, CF-Connecting-IP nao zera o contador")
+    void cabecalhoIgnoradoQuandoConfiancaDesligada() throws Exception {
+        // Este teste chamava-se "BYPASS: cabeçalho forjado não zera o contador"
+        // e NÃO provava isso. A confiança no Cloudflare está desligada no perfil
+        // de teste, então ele cobre apenas o caso trivial: o cabeçalho nem é
+        // lido. Enquanto ele passava, o rate limit era de fato contornável — por
+        // X-Forwarded-For, que nenhum teste tocava.
+        //
+        // Os bypasses de verdade estão no RateLimitBypassTest. Este fica como
+        // guarda do caminho desligado, com o nome dizendo o que ele faz.
         for (int i = 0; i < 3; i++) {
             mvc.perform(post("/login")
                     .with(r -> { r.setRemoteAddr("203.0.113.30"); return r; })

@@ -133,6 +133,11 @@ soulie:
     # instância: continua barrando o abuso óbvio, mas com N instâncias o teto
     # real é N vezes maior.
     distributed: "${RATE_LIMIT_DISTRIBUTED:false}"
+    # Teto de contadores do modo em memoria. Existe porque sem ele o
+    # proprio limitador derruba o processo: a chave inclui o IP de quem
+    # chama, e um mapa que nunca remove entrada cresce com cada origem
+    # distinta da internet ate dar OutOfMemoryError.
+    max-in-memory-entries: "${RATE_LIMIT_MAX_ENTRIES:100000}"
     default-capacity: 120
     default-window: PT1M
     rules:

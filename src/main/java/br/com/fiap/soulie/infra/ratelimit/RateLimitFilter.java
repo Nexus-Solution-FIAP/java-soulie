@@ -1,7 +1,7 @@
 package br.com.fiap.soulie.infra.ratelimit;
 
-import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.infra.cloudflare.ClientIpResolver;
+import br.com.fiap.soulie.infra.security.TokenService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -11,24 +11,33 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
+import java.util.HexFormat;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Aplica os limites de uso.
  *
  * <p>Roda <b>antes</b> do {@code SecurityFilter}, para que {@code POST /login} e
- * {@code POST /user} — que são públicos — já cheguem protegidos. Isso tem uma
- * consequência: nessas rotas ainda não há usuário autenticado, então a chave é
- * o IP. Nas rotas autenticadas a chave é o id do usuário, que é mais justo e não
- * pune quem compartilha saída de rede.
+ * {@code POST /user} — que são públicos — já cheguem protegidos.
+ *
+ * <p>Isso cria um problema que a primeira versão deste filtro não resolveu:
+ * rodando antes da autenticação, o {@code SecurityContextHolder} está
+ * <b>sempre vazio</b> aqui (a API é {@code STATELESS}, não há sessão de onde o
+ * contexto viesse), então ler o principal dali era código morto e <b>toda</b>
+ * regra acabava chaveada por IP. O comentário antigo afirmava o contrário.
+ *
+ * <p>A correção é {@link #chaveDe}: o filtro lê o <i>subject</i> do próprio
+ * token, sem autenticar e sem tocar no banco. Com isso a chave de uma rota
+ * autenticada é a identidade, que é mais justa e não pune quem compartilha
+ * saída de rede — e quem rotaciona IP não ganha balde novo.
  */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
@@ -40,17 +49,22 @@ public class RateLimitFilter extends OncePerRequestFilter {
     /** Evita encher o log com um alerta por requisição quando o Redis cai. */
     private final AtomicBoolean jaAvisouDegradacao = new AtomicBoolean(false);
 
+    private static final String PREFIXO_BEARER = "Bearer ";
+
     private final RateLimitProperties properties;
     private final ClientIpResolver clientIpResolver;
+    private final TokenService tokenService;
     private final InMemoryRateLimitStore memoria;
     private final ObjectProvider<RedisRateLimitStore> redis;
 
     public RateLimitFilter(RateLimitProperties properties,
                            ClientIpResolver clientIpResolver,
+                           TokenService tokenService,
                            InMemoryRateLimitStore memoria,
                            ObjectProvider<RedisRateLimitStore> redis) {
         this.properties = properties;
         this.clientIpResolver = clientIpResolver;
+        this.tokenService = tokenService;
         this.memoria = memoria;
         this.redis = redis;
     }
@@ -77,12 +91,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (!properties.isEnabled()) {
             return true;
         }
-        String path = caminhoDe(request);
-        // Swagger e /error não entram na conta: são navegação, não uso da API.
-        return matcher.match("/v3/api-docs/**", path)
-                || matcher.match("/swagger-ui/**", path)
-                || "/swagger-ui.html".equals(path)
-                || "/error".equals(path);
+        // Só /error fica de fora, porque é despacho interno do container: uma
+        // requisição já contada não pode consumir um segundo token ao ser
+        // encaminhada para a página de erro.
+        //
+        // O Swagger ESTAVA isento aqui, e isso era um buraco: /v3/api-docs é
+        // público (permitAll) e gera o documento OpenAPI inteiro, então sem teto
+        // era amplificação barata — uma requisição, resposta grande — além de
+        // entregar o mapa completo da API. Agora ele cai no teto geral.
+        return "/error".equals(caminhoDe(request));
     }
 
     @Override
@@ -90,11 +107,14 @@ public class RateLimitFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
         var regra = regraPara(request);
-        String chave = chaveDe(request, regra);
 
-        RateLimitStore store = escolherStore();
         RateLimitStore.Resultado resultado;
         try {
+            // chaveDe entra no try de proposito: ele resolve IP e token, e
+            // excecao aqui escapava do filtro, virava 500 do container e nao
+            // passava pelo @RestControllerAdvice.
+            String chave = chaveDe(request, regra);
+            RateLimitStore store = escolherStore();
             resultado = store.tentarConsumir(
                     chave + "|" + nomeDaRegra(request, regra),
                     regra == null ? properties.getDefaultCapacity() : regra.getCapacity(),
@@ -148,21 +168,58 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * Id do usuário quando autenticado; IP real quando não.
+     * Identidade de quem chamou quando há token válido; IP real quando não.
      *
      * <p>Uma regra pode forçar o IP ({@code byIp}) — é o caso do login e do
      * cadastro, onde ainda não existe usuário.
+     *
+     * <p>A identidade sai do <i>subject</i> do token, verificado aqui mesmo.
+     * Não dá para ler o {@code SecurityContextHolder}: este filtro roda
+     * <b>antes</b> do {@code SecurityFilter}, de propósito, então o contexto
+     * ainda está vazio. Verificar a assinatura duas vezes custa um HMAC, que é
+     * barato, e evita a alternativa ruim — consultar o banco antes de
+     * autenticar.
+     *
+     * <p>O subject é um e-mail, então ele vai <b>em hash</b> para a chave. Chave
+     * de contador acaba em log de Redis e em ferramenta de observação, e e-mail
+     * de pessoa real não tem por que aparecer ali. O hash também fixa o tamanho
+     * da chave, em vez de deixá-lo vir de entrada do cliente.
      */
     private String chaveDe(HttpServletRequest request, RateLimitProperties.Regra regra) {
         boolean forcarIp = regra != null && regra.isByIp();
 
         if (!forcarIp) {
-            var auth = SecurityContextHolder.getContext().getAuthentication();
-            if (auth != null && auth.getPrincipal() instanceof User user && user.getId() != null) {
-                return "u:" + user.getId();
+            String identidade = identidadeDoToken(request);
+            if (identidade != null) {
+                return "u:" + identidade;
             }
         }
         return "ip:" + clientIpResolver.resolver(request);
+    }
+
+    /**
+     * O subject do token, em hash — ou {@code null} se não houver token válido.
+     *
+     * <p>Token ausente, malformado, expirado ou assinado com outro segredo cai
+     * para o limite por IP. Isso é o certo: sem identidade comprovada, o único
+     * identificador honesto é de onde a conexão veio.
+     */
+    private String identidadeDoToken(HttpServletRequest request) {
+        String cabecalho = request.getHeader("Authorization");
+        if (cabecalho == null || !cabecalho.startsWith(PREFIXO_BEARER)) {
+            return null;
+        }
+        try {
+            String subject = tokenService.getSubject(cabecalho.substring(PREFIXO_BEARER.length()).trim());
+            if (subject == null || subject.isBlank()) {
+                return null;
+            }
+            var digest = MessageDigest.getInstance("SHA-256")
+                    .digest(subject.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest, 0, 8);
+        } catch (Exception exception) {
+            return null;
+        }
     }
 
     private String nomeDaRegra(HttpServletRequest request, RateLimitProperties.Regra regra) {

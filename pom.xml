@@ -88,20 +88,15 @@
             De todo modo precisamos de filtro proprio, porque os limites sao por
             rota e por identidade (usuario autenticado vs IP real do Cloudflare).
 
-            Sobre a versao do Lettuce: o modulo -lettuce declara lettuce-core
-            6.1.8 como `provided`, e o Boot 4.1.1 traz 7.5.2. O escopo provided e
-            so o piso de compilacao, e o modulo roda contra Lettuce 7.x na
-            pratica. O que quebraria e o Lettuce 8, que remove as APIs Reactor.
+            So o -core entra. O modulo -lettuce esteve aqui com um paragrafo
+            justificando a versao do Lettuce dele, e NENHUMA classe o importava:
+            o caminho do Redis e script Lua sobre StringRedisTemplate, e do
+            Bucket4j usamos Bandwidth, Bucket e ConsumptionProbe, todos no store
+            em memoria. Dependencia morta e superficie de CVE sem contrapartida.
         -->
         <dependency>
             <groupId>com.bucket4j</groupId>
             <artifactId>bucket4j_jdk17-core</artifactId>
-            <version>${bucket4j.version}</version>
-        </dependency>
-
-        <dependency>
-            <groupId>com.bucket4j</groupId>
-            <artifactId>bucket4j_jdk17-lettuce</artifactId>
             <version>${bucket4j.version}</version>
         </dependency>
 
