@@ -29,8 +29,54 @@
     <properties>
         <java.version>21</java.version>
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
+        <awssdk.version>2.49.6</awssdk.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!--
+                O AWS SDK NAO e gerenciado pelo BOM do Spring Boot (conferido no
+                spring-boot-dependencies-4.1.1.pom). Sem este BOM proprio, cada
+                artefato do SDK precisaria de versao propria aqui, e elas acabariam
+                divergindo entre si.
+            -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <!-- Storage das imagens de evidencia: bucket do Railway, compativel com S3. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <exclusions>
+                <!--
+                    O cliente HTTP padrao do SDK e o Netty assincrono, que arrasta
+                    uma arvore grande de dependencias. Para enviar e assinar objeto
+                    o cliente sincrono baseado em HttpURLConnection basta.
+                -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>apache-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>

@@ -41,3 +41,14 @@ api:
 logging:
   level:
     org.hibernate.SQL: WARN
+
+soulie:
+  storage:
+    # Valores de fachada: nenhum teste chama o bucket de verdade. Existem porque
+    # o bean do storage é construído na subida do contexto.
+    endpoint: "http://localhost:9000"
+    region: "auto"
+    bucket: "soulie-test"
+    access-key: "test"
+    secret-key: "test"
+    public-base-url: ""

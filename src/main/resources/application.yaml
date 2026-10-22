@@ -52,3 +52,17 @@ api:
   cors:
     # Lista explícita de origens. Curinga não é aceito aqui.
     allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8081}"
+
+soulie:
+  storage:
+    # Bucket compatível com S3. Em produção é o object storage do Railway.
+    endpoint: "${S3_ENDPOINT}"
+    region: "${S3_REGION:auto}"
+    bucket: "${S3_BUCKET}"
+    access-key: "${S3_ACCESS_KEY}"
+    secret-key: "${S3_SECRET_KEY}"
+    # Vazio = bucket privado. A IA lê por URL assinada, que expira.
+    public-base-url: "${S3_PUBLIC_BASE_URL:}"
+    presigned-url-ttl: "${S3_PRESIGNED_TTL:PT15M}"
+    max-bytes: 10485760
+
