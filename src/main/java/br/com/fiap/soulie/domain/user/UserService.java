@@ -6,6 +6,8 @@ import br.com.fiap.soulie.domain.avatar.AvatarRepository;
 import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
 import br.com.fiap.soulie.domain.user.dto.UserRequest;
 import br.com.fiap.soulie.domain.user.dto.UserResponse;
+import br.com.fiap.soulie.infra.exception.BusinessException;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +15,17 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Rotas legadas de usuário.
+ *
+ * <p>Todas as operações sobre uma conta existente passaram a ser **sobre a
+ * própria conta**. Antes, `PATCH /user/{id}` recebia um id qualquer e reativava
+ * aquela conta sem conferir posse: qualquer usuário autenticado podia desfazer o
+ * `DELETE /v1/users/me` de outra pessoa, isto é, cancelar a exclusão de conta
+ * que o titular pediu.
+ *
+ * <p>O contrato novo do app usa `/v1/users/me` ({@code ProfileApiService}).
+ */
 @Service
 public class UserService {
 
@@ -33,9 +46,13 @@ public class UserService {
         return repository.findAllByActiveTrue(pageable).map(mapper::toDetail);
     }
 
-    public UserResponse userDetails(Long id){
-        var user = repository.getReferenceById(id);
-        return mapper.toDetail(user);
+    public UserResponse userDetails(Long id) {
+        return mapper.toDetail(findOwn(id, id));
+    }
+
+    /** Detalhe de uma conta, apenas se for a do próprio solicitante. */
+    public UserResponse userDetails(Long id, Long requesterId) {
+        return mapper.toDetail(findOwn(id, requesterId));
     }
 
     // Post
@@ -43,8 +60,12 @@ public class UserService {
     public UserResponse registerUser(UserRequest userRequest) {
         var user = mapper.toEntity(userRequest);
         user.assignHandle(uniqueHandle(userRequest.email()));
-        repository.save(user);
+        // Criptografar ANTES de salvar. A ordem anterior salvava primeiro e só
+        // depois criptografava, funcionando por dirty-checking do Hibernate —
+        // correto por acidente, e quebraria se o método deixasse de ser
+        // transacional ou se alguém inserisse um flush no meio.
         user.encryptPassword(passwordEncoder);
+        repository.save(user);
         avatarRepository.save(Avatar.starter(user));
         return mapper.toDetail(user);
     }
@@ -52,25 +73,44 @@ public class UserService {
     // Put
     @Transactional
     public UserResponse updateUser(UpdateUserData updateUserData, Long id) {
-        var user = repository.getReferenceById(id);
+        var user = findExisting(id);
         user.updateData(updateUserData);
+        // A senha nunca é atribuída crua: updateData não mexe nela.
+        user.changePassword(updateUserData.password(), passwordEncoder);
         return mapper.toDetail(user);
     }
 
     // Patch
     @Transactional
-    public UserResponse activeUser(Long id){
-        var user = repository.getReferenceById(id);
+    public UserResponse activeUser(Long id, Long requesterId) {
+        var user = findOwn(id, requesterId);
         user.activateUser();
         return mapper.toDetail(user);
     }
 
     // Delete
     @Transactional
-    public UserResponse excludeUser(Long id) {
-        var user = repository.getReferenceById(id);
-        user.deleteUser();
-        return mapper.toDetail(user);
+    public void excludeUser(Long id) {
+        findExisting(id).deleteUser();
+    }
+
+    private User findExisting(Long id) {
+        return repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado"));
+    }
+
+    /**
+     * Carrega a conta só se ela for do solicitante.
+     *
+     * <p>Devolve 403 em vez de 404 quando o id existe mas é de outra pessoa —
+     * a existência da conta já é observável por outros caminhos, e um 404 aqui
+     * esconderia do próprio titular um erro de uso legítimo.
+     */
+    private User findOwn(Long id, Long requesterId) {
+        if (id == null || requesterId == null || !id.equals(requesterId)) {
+            throw BusinessException.acessoNegado("Você só pode acessar a sua própria conta");
+        }
+        return findExisting(id);
     }
 
     private String uniqueHandle(String email) {

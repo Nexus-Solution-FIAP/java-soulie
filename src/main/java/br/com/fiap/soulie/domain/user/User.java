@@ -20,6 +20,7 @@ import java.util.Set;
 
 @AllArgsConstructor
 @NoArgsConstructor
+@Builder
 @Getter
 @Setter
 @EqualsAndHashCode(of = "id")
@@ -72,24 +73,44 @@ public class User implements UserDetails {
     @Column(name = "show_full_name")
     private Boolean showFullName;
 
+    @Builder.Default
     @ManyToMany(mappedBy = "users")
     private Set<Garden> gardens = new HashSet<>();
 
 
+    /**
+     * Atualiza nome e e-mail. **Não mexe em senha de propósito.**
+     *
+     * <p>A versão anterior atribuía {@code updateUserData.password()} direto no
+     * campo, sem passar pelo encoder — ou seja, {@code PUT /user} gravava a senha
+     * em texto puro no banco, ao contrário do cadastro. Além de expor a
+     * credencial num eventual dump, travava o usuário fora da conta, porque o
+     * BCrypt nunca casa com um valor não criptografado.
+     *
+     * <p>Troca de senha agora é operação própria: {@link #changePassword}.
+     */
     public void updateData(@Valid UpdateUserData updateUserData) {
-        if(updateUserData.name() != null ){
+        if (updateUserData.name() != null && !updateUserData.name().isBlank()) {
             this.name = updateUserData.name();
         }
 
-        if(updateUserData.email() != null){
+        if (updateUserData.email() != null && !updateUserData.email().isBlank()) {
             this.email = updateUserData.email();
         }
+    }
 
-        // Aqui precisa passar por uma validação,
-        // o usuário não pode simplesmente mudar a senha quando ele quiser.
-        if(updateUserData.password() != null){
-            this.password = updateUserData.password();
+    /**
+     * Troca a senha, sempre criptografada.
+     *
+     * <p>Pendência conhecida, registrada em {@code docs/07-seguranca.md}: o fluxo
+     * ideal exigiria a senha atual antes de aceitar a nova. Hoje basta estar
+     * autenticado, então um token roubado permite trocar a senha e tomar a conta.
+     */
+    public void changePassword(String rawPassword, PasswordEncoder passwordEncoder) {
+        if (rawPassword == null || rawPassword.isBlank()) {
+            return;
         }
+        this.password = passwordEncoder.encode(rawPassword);
     }
 
     public void deleteUser() {
@@ -136,6 +157,25 @@ public class User implements UserDetails {
         if (xp > 0) {
             this.points += xp;
         }
+    }
+
+    /**
+     * Gasta pontos no resgate de uma recompensa.
+     *
+     * <p>A versão desta regra no {@code soulie-soul-up} era apenas
+     * {@code this.points -= points}, sem guarda: por corrida entre dois resgates
+     * simultâneos o saldo podia ficar negativo, mesmo com o
+     * {@code SufficientPointsValidator} na frente. A checagem aqui é a última
+     * linha de defesa, dentro da própria entidade.
+     */
+    public void spendPoints(int amount) {
+        if (amount <= 0) {
+            throw new IllegalArgumentException("A quantidade de pontos a gastar deve ser positiva");
+        }
+        if (amount > this.points) {
+            throw new IllegalStateException("Saldo de pontos insuficiente");
+        }
+        this.points -= amount;
     }
 
     public void addImpact(double co2, double water) {
