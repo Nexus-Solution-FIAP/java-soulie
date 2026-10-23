@@ -128,6 +128,17 @@ soulie:
     wait-timeout: "${SOULIE_VALIDATE_WAIT:PT6S}"
     stub-approve: "${SOULIE_AI_STUB:false}"
 
+  chat:
+    # URL só daqui, nunca do body. Contrato OpenAI chat/completions (Groq ou
+    # Gemini compat). Sem URL ou sem chave, a Alma responde o FAQ local.
+    url: "${SOULIE_CHAT_LLM_URL:}"
+    api-key: "${SOULIE_CHAT_LLM_API_KEY:}"
+    model: "${SOULIE_CHAT_LLM_MODEL:qwen/qwen3.8-27b}"
+    connect-timeout: PT5S
+    read-timeout: "${SOULIE_CHAT_LLM_READ_TIMEOUT:PT20S}"
+    max-tokens: 600
+    temperature: 0.4
+
   cloudflare:
     # Ligue SÓ quando a API estiver de fato atrás do Cloudflare. Com isto
     # ligado, CF-Connecting-IP passa a ser aceito — mas apenas quando a conexão
@@ -175,6 +186,12 @@ soulie:
       - method: POST
         path: /api/v1/missions/*/validate
         capacity: 10
+        window: PT1H
+      # Chamada paga de LLM. Um padrão só para os dois prefixos contarem
+      # no mesmo balde (senão 20+20 virava 40/h por conta).
+      - method: POST
+        path: /**/chat/soulie-ia
+        capacity: 20
         window: PT1H
       # Seguir é vetor de spam e insumo de enumeração.
       - method: POST
