@@ -64,8 +64,8 @@ public class MissionApiController {
             description = """
                     Consulta o resultado da análise da foto. Enquanto `status` for PENDING,                     a IA ainda não respondeu.
 
-                    APPROVED: o XP já foi creditado e os campos de recompensa estão preenchidos.                     REJECTED: a foto não comprova a missão. O `aiDetections` traz o que a IA \
-                    identificou; o texto do motivo vai na notificação, não nesta resposta.                     FAILED: não foi possível analisar — é falha nossa, a evidência será reprocessada.""")
+                    APPROVED: o XP já foi creditado e os campos de recompensa estão preenchidos.                     REJECTED: a foto não comprova a missão. O `reason` traz o motivo da IA; \
+                    `aiDetections` o que ela identificou.                     FAILED: não foi possível analisar — é falha nossa, a evidência será reprocessada.""")
     public ResponseEntity<MissionValidationResponse> validationStatus(
             @Parameter(hidden = true) @AuthenticationPrincipal User user,
             @Parameter(description = "Id devolvido no envio da foto", example = "42") @PathVariable Long id) {

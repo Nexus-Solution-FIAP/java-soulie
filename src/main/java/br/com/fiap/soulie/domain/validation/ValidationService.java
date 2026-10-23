@@ -63,6 +63,12 @@ public class ValidationService {
                 .orElseThrow(() -> new EntityNotFoundException("Validação não encontrada"));
     }
 
+    @Transactional(readOnly = true)
+    public Validation findDetalheById(Long validationId) {
+        return validationRepository.findDetalheById(validationId)
+                .orElseThrow(() -> new EntityNotFoundException("Validação não encontrada"));
+    }
+
     /**
      * Espera o veredito sair de PENDING, consultando o banco em transações curtas.
      *

@@ -15,6 +15,25 @@ public interface ValidationRepository extends JpaRepository<Validation, Long> {
 
     Optional<Validation> findByEvidenceId(Long evidenceId);
 
+    /**
+     * Carrega a validação já com evidência, dono e missão do app.
+     *
+     * <p>{@code MissionApiService.validate} não é {@code @Transactional} (o
+     * upload e a espera da IA não podem reter conexão do pool) e chama
+     * {@code statusDaValidacao} no mesmo bean — a anotação transacional dali
+     * não vale, porque é auto-invocação. Sem o {@code join fetch}, a evidência
+     * volta como proxy {@code LAZY} e o acesso a {@code user} estoura
+     * {@code LazyInitializationException}: 500 em todo envio de foto.
+     */
+    @Query("""
+            select v from Validation v
+              join fetch v.evidence e
+              join fetch e.user
+              left join fetch e.dailyMission
+             where v.id = :id
+            """)
+    Optional<Validation> findDetalheById(@Param("id") Long id);
+
     List<Validation> findAllByResultValidation(ResultValidation resultValidation);
 
     /**

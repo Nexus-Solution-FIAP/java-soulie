@@ -50,7 +50,8 @@ ValidationConsumer  @RabbitListener
    │  registra tentativa
    │  ImageValidationClient.validate(URL assinada + contexto da missão)
    ▼
-API da IA do parceiro  ──► { status, detections, confidence, reason }
+API da IA (soulie-validation-pictures, POST /v1/analisar)
+                       ──► { status, detections, confidence, reason }
    ▼
 ValidationOutcomeService.aplicar
    │  ValidationService.resolve  ──já resolvida──► para aqui, nada acontece
@@ -88,6 +89,12 @@ Publicar dentro da transação é uma corrida clássica: o worker é rápido, co
 a mensagem antes do commit, não encontra a validação no banco, e a evidência
 fica `PENDING` para sempre. O bug só aparece sob carga — que é exatamente quando
 ninguém quer descobri-lo.
+
+No perfil `dev` o processor roda **nessa mesma thread**, ainda dentro do
+`AFTER_COMMIT`. A transação original já morreu, então o `UPDATE` do veredito
+precisa de `REQUIRES_NEW` em `ValidationOutcomeService.aplicar`. Sem isso a IA
+responde, o flush falha com `No active transaction` e a evidência fica
+`PENDING` — o mesmo sintoma, causa diferente.
 
 ### A resolução é um UPDATE condicional, não um `if` em Java
 
@@ -137,6 +144,23 @@ worker viraria um proxy de SSRF contra a rede interna. A validação de
 `Evidence.image` (Fase 3b) fechou a porta de entrada; esta regra fecha a de
 saída.
 
+### A chamada à IA é HTTP/1.1
+
+O `HttpClient` do JDK escolhe HTTP/2 por padrão. O uvicorn da API de fotos
+(h11) não fala h2c: o preâmbulo vira `400 Invalid HTTP request received`, a
+análise fica vazia e a evidência nunca sai de `PENDING`. HTTPS com ALPN (o
+caso do Expo) não entra aqui — esta chamada é `http://` na rede local.
+
+### `statusDaValidacao` não pode depender da transação do controller
+
+`MissionApiService.validate` não é `@Transactional` de propósito (upload e
+espera da IA não podem reter conexão). No fim ele chama `statusDaValidacao`
+**no mesmo bean**, então a anotação transacional dali não vale. A evidência
+é `LAZY`; sem `join fetch` em `ValidationRepository.findDetalheById`, o
+primeiro `evidence.getUser()` estoura `LazyInitializationException` — 500 em
+todo envio de foto, com a suíte verde se o teste estiver dentro de
+`@DataJpaTest`.
+
 ## O que acontece quando dá errado
 
 | Situação | Comportamento |
@@ -166,8 +190,8 @@ descartar isso em silêncio.
 ## O que mudou para o app
 
 Nenhum campo de `MissionValidationResponse` foi removido ou renomeado. Entraram
-dois: `validationId` e `status`. O que mudou é **quando** os valores ficam
-preenchidos.
+`validationId`, `status` e `reason` (o motivo da IA, para o app mostrar a tela
+de ação não comprovada). O que mudou é **quando** os valores ficam preenchidos.
 
 | Antes | Agora |
 |---|---|
@@ -175,6 +199,7 @@ preenchidos.
 | Foto opcional | Foto **obrigatória** |
 | `aiDetections` com frases fixas | `aiDetections` vazio até a IA responder |
 | — | `GET /v1/missions/validations/{id}` para consultar |
+| — | `reason` com o motivo da IA em REJECTED |
 | — | Push quando o resultado sai |
 
 Um cliente antigo continua desserializando normalmente e lê `xpGained: 0`.
@@ -188,5 +213,6 @@ Um cliente antigo continua desserializando normalmente e lê `xpGained: 0`.
 ## Configuração
 
 Tudo em `.env` (veja `.env.example`): `S3_*` para o bucket, `RABBITMQ_*` para a
-fila, `AI_*` para a IA. O contrato que o parceiro precisa implementar está em
-[`04-contrato-ia.md`](04-contrato-ia.md).
+fila, `AI_*` para a IA. No perfil `dev` a URL padrão é
+`http://localhost:5000/v1/analisar` (repo `soulie-validation-pictures`, modo
+`BYTES`). O contrato está em [`04-contrato-ia.md`](04-contrato-ia.md).

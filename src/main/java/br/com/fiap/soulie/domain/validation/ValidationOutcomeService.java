@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -54,8 +55,15 @@ public class ValidationOutcomeService {
      * passar uma vez. Se ele devolver vazio, outra entrega da mensagem já
      * cuidou desta validação, e nada mais acontece — nem recompensa, nem push.
      * É isso que impede a reentrega do RabbitMQ de creditar XP duas vezes.
+     *
+     * <p>{@code REQUIRES_NEW} porque, no perfil {@code dev}, o processor roda
+     * no listener {@code AFTER_COMMIT} da transação que gravou a evidência. Ali
+     * a transação original já acabou: um {@code @Modifying} (o
+     * {@code resolveIfPending}) dispara {@code No active transaction}, a
+     * análise da IA se perde e a evidência fica {@code PENDING}. Com fila
+     * (thread do Rabbit) isso não aparece; sem fila, sim.
      */
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void aplicar(Long validationId, ImageValidationContract.Result resultado) {
         Optional<Validation> resolvida = validationService.resolve(validationId, resultado);
         if (resolvida.isEmpty()) {

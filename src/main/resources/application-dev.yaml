@@ -2,7 +2,7 @@
 #
 # As variáveis DB_* e SECRET_JWT continuam obrigatórias — veja .env.example.
 # RabbitMQ e S3 NÃO são obrigatórios aqui: foto vai para disco e a validação
-# roda no mesmo processo (stub de aprovação se não houver API de IA).
+# roda no mesmo processo. A IA padrão é o Python em localhost:5000.
 spring:
   jpa:
     show-sql: true
@@ -27,7 +27,12 @@ soulie:
     type: local
     local-dir: data/soulie-images
   ai:
-    stub-approve: true
+    # A IA local é o repo soulie-validation-pictures (uvicorn na :5000).
+    # Se o Python não estiver no ar, deixe AI_VALIDATION_URL vazio e
+    # SOULIE_AI_STUB=true para voltar a aprovar tudo no dev.
+    url: "${AI_VALIDATION_URL:http://localhost:5000/v1/analisar}"
+    delivery-mode: "${AI_DELIVERY_MODE:BYTES}"
+    stub-approve: "${SOULIE_AI_STUB:false}"
     wait-timeout: PT6S
 
 logging:
