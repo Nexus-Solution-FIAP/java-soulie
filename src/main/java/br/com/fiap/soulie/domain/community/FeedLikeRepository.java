@@ -8,4 +8,6 @@ public interface FeedLikeRepository extends JpaRepository<FeedLike, Long> {
     Optional<FeedLike> findByPost_IdAndUser_Id(Long postId, Long userId);
 
     long countByPost_Id(Long postId);
+
+    void deleteByPost_Id(Long postId);
 }

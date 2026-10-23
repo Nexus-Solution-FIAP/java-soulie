@@ -203,3 +203,11 @@ soulie:
         path: /api/v1/community/feed/**
         capacity: 20
         window: PT1H
+      - method: DELETE
+        path: /v1/community/feed/*
+        capacity: 20
+        window: PT1H
+      - method: DELETE
+        path: /api/v1/community/feed/*
+        capacity: 20
+        window: PT1H

@@ -9,4 +9,6 @@ public interface FeedCommentRepository extends JpaRepository<FeedComment, Long> 
     List<FeedComment> findAllByPost_IdOrderByCreatedAtAsc(Long postId);
 
     long countByPost_Id(Long postId);
+
+    void deleteByPost_Id(Long postId);
 }
