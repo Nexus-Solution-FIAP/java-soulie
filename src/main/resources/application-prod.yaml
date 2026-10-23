@@ -20,6 +20,15 @@ logging:
     br.com.fiap.soulie: INFO
     org.hibernate.SQL: WARN
 
+soulie:
+  messaging:
+    enabled: true
+  storage:
+    type: s3
+  ai:
+    stub-approve: false
+    wait-timeout: PT6S
+
 springdoc:
   # A API não publica a própria superfície em produção. Enquanto o Cloudflare
   # Access (Fase 6) não estiver no lugar, Swagger e /v3/api-docs abertos

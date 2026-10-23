@@ -64,6 +64,15 @@ public class ImageValidationClient {
                                                              ImageValidationContract.Mission mission,
                                                              String callbackUrl) {
         if (properties.getUrl() == null || properties.getUrl().isBlank()) {
+            if (properties.isStubApprove()) {
+                log.warn("soulie.ai.url vazia: validação {} aprovada pelo stub de desenvolvimento", validationId);
+                return Optional.of(new ImageValidationContract.Result(
+                        "APPROVED",
+                        java.util.List.of("Validação local (perfil dev)"),
+                        1.0,
+                        "Stub de desenvolvimento: sem API de IA configurada",
+                        "stub-dev"));
+            }
             log.warn("soulie.ai.url não configurada: validação {} não pode ser analisada", validationId);
             return Optional.empty();
         }

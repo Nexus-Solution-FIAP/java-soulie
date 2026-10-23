@@ -38,3 +38,6 @@ build/
 !.env.example
 *.pem
 *.p12
+
+### Storage local (perfil dev) ###
+data/

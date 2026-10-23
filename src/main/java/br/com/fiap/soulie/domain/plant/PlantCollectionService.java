@@ -39,7 +39,7 @@ public class PlantCollectionService {
         boolean created = false;
         for (PlantCatalog item : PlantCatalog.values()) {
             if (!existing.containsKey(item.flower())) {
-                userPlantRepository.insertIfAbsent(user.getId(), item.flower().name());
+                userPlantRepository.save(UserPlant.locked(user, item.flower()));
                 created = true;
             }
         }
@@ -169,11 +169,7 @@ public class PlantCollectionService {
 
     private UserPlant row(User user, FlowerType flower) {
         return userPlantRepository.findByUser_IdAndPlantType(user.getId(), flower)
-                .orElseGet(() -> {
-                    userPlantRepository.insertIfAbsent(user.getId(), flower.name());
-                    return userPlantRepository.findByUser_IdAndPlantType(user.getId(), flower)
-                            .orElseGet(() -> userPlantRepository.save(UserPlant.locked(user, flower)));
-                });
+                .orElseGet(() -> userPlantRepository.save(UserPlant.locked(user, flower)));
     }
 
     private Map<FlowerType, UserPlant> index(User user) {

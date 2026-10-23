@@ -111,7 +111,7 @@ Qualquer resposta que não seja `APPROVED` ou `REJECTED` vira `FAILED`.
 - **FAILED** = "não conseguimos analisar" → o usuário é avisado de que o problema foi **nosso**.
 
 Tratar os dois igual puniria quem fez a ação corretamente por uma falha de
-infraestrutura. Era por isso que o enum ganhou `FAILED` na migration V20.
+infraestrutura. Era por isso que o enum ganhou `FAILED` na migration V21.
 
 ### A chave do objeto é UUID do servidor
 

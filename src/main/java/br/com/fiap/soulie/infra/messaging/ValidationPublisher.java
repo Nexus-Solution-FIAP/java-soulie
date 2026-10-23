@@ -5,46 +5,56 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Publica o pedido de validação na fila.
+ * Publica o pedido de validação depois do commit.
  *
- * <p><b>A publicação acontece em {@code AFTER_COMMIT}, e isso não é detalhe de
- * estilo.</b> Publicar dentro da transação é uma corrida clássica: o worker é
- * rápido, consome a mensagem antes do commit e não encontra a validação no
- * banco — a evidência fica PENDING para sempre, e o bug só aparece sob carga,
- * que é quando ninguém quer descobri-lo.
- *
- * <p>Por isso o serviço dispara um {@link ValidationRequestedEvent} e quem
- * publica é este listener, depois que a transação confirmou.
+ * <p>Com Rabbit ligado, manda para a fila. Sem fila (perfil {@code dev}),
+ * processa na hora no mesmo processo.
  */
 @Component
 public class ValidationPublisher {
 
     private static final Logger log = LoggerFactory.getLogger(ValidationPublisher.class);
 
-    private final RabbitTemplate rabbitTemplate;
+    private final ObjectProvider<RabbitTemplate> rabbitTemplate;
+    private final ValidationProcessor processor;
+    private final boolean messagingEnabled;
 
-    public ValidationPublisher(RabbitTemplate rabbitTemplate) {
+    public ValidationPublisher(ObjectProvider<RabbitTemplate> rabbitTemplate,
+                               @Lazy ValidationProcessor processor,
+                               @Value("${soulie.messaging.enabled:false}") boolean messagingEnabled) {
         this.rabbitTemplate = rabbitTemplate;
+        this.processor = processor;
+        this.messagingEnabled = messagingEnabled;
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void publicar(ValidationRequestedEvent evento) {
+        if (!messagingEnabled) {
+            processor.processar(evento.validationId());
+            return;
+        }
+
+        RabbitTemplate template = rabbitTemplate.getIfAvailable();
+        if (template == null) {
+            log.error("RabbitTemplate ausente; validação {} ficou PENDING", evento.validationId());
+            return;
+        }
+
         try {
-            rabbitTemplate.convertAndSend(
+            template.convertAndSend(
                     RabbitConfig.EXCHANGE,
                     RabbitConfig.ROUTING_KEY,
                     new ValidationMessage(evento.validationId()));
             log.debug("Validação {} publicada na fila", evento.validationId());
         } catch (AmqpException exception) {
-            // Aqui a transação já foi confirmada: a evidência está salva e a
-            // validação está PENDING. Não dá para devolver erro ao cliente, e
-            // também não se perde nada — a validação fica no banco e pode ser
-            // reenfileirada. Ver docs/08-operacao.md.
             log.error("Não foi possível publicar a validação {} na fila. "
                     + "Ela está PENDING no banco e precisa ser reenfileirada.",
                     evento.validationId(), exception);
@@ -54,13 +64,19 @@ public class ValidationPublisher {
     /**
      * Confere que a fila está acessível ANTES de aceitar a evidência.
      *
-     * <p>Chamado pelo serviço no início da operação. Serve para o cliente
-     * receber 503 com mensagem clara em vez de um 202 que promete uma análise
-     * que nunca vai acontecer.
+     * <p>No modo local não há fila: o processamento roda depois do commit.
      */
     public void exigirFilaDisponivel() {
+        if (!messagingEnabled) {
+            return;
+        }
+        RabbitTemplate template = rabbitTemplate.getIfAvailable();
+        if (template == null) {
+            throw BusinessException.indisponivel(
+                    "Não foi possível registrar sua evidência agora. Tente novamente em instantes.");
+        }
         try {
-            rabbitTemplate.execute(canal -> canal.queueDeclarePassive(RabbitConfig.QUEUE));
+            template.execute(canal -> canal.queueDeclarePassive(RabbitConfig.QUEUE));
         } catch (AmqpException exception) {
             log.error("Fila de validação indisponível", exception);
             throw BusinessException.indisponivel(

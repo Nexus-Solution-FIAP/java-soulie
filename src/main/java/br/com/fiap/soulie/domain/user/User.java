@@ -174,7 +174,7 @@ public class User implements UserDetails {
      * saldo, as duas passam por aqui e as duas gravam — gastando o mesmo saldo
      * duas vezes. Quem resolve isso é o débito atômico em
      * {@code UserRepository.debitPoints}, que o {@code RewardService} usa, mais
-     * o {@code CHECK (points >= 0)} da migration V21.
+     * o {@code CHECK (points >= 0)} da migration V22.
      *
      * <p>Mantida como última linha de defesa para quem manipular a entidade
      * fora daquele caminho.

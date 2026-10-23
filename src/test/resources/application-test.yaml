@@ -12,7 +12,7 @@ spring:
     password: ""
     driver-class-name: "org.h2.Driver"
   flyway:
-    # As migrations usam sintaxe exclusiva do PostgreSQL (a V20 faz
+    # As migrations usam sintaxe exclusiva do PostgreSQL (a V21 faz
     # ALTER COLUMN ... TYPE ... USING CASE, que o H2 não entende).
     enabled: false
   jpa:
@@ -39,6 +39,9 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 12MB
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
 
 api:
   security:
@@ -53,9 +56,11 @@ logging:
     org.hibernate.SQL: WARN
 
 soulie:
+  messaging:
+    enabled: false
   storage:
-    # Valores de fachada: nenhum teste chama o bucket de verdade. Existem porque
-    # o bean do storage é construído na subida do contexto.
+    type: local
+    local-dir: target/soulie-test-images
     endpoint: "http://localhost:9000"
     region: "auto"
     bucket: "soulie-test"
@@ -67,6 +72,8 @@ soulie:
     api-key: ""
     webhook-enabled: false
     webhook-secret: "segredo-de-teste-do-webhook-com-tamanho-suficiente"
+    wait-timeout: PT0S
+    stub-approve: false
 
   cloudflare:
     enabled: false

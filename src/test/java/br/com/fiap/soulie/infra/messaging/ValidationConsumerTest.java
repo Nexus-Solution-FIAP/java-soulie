@@ -47,7 +47,7 @@ import static org.mockito.Mockito.when;
 @ActiveProfiles("test")
 class ValidationConsumerTest {
 
-    @Autowired private ValidationConsumer consumer;
+    @Autowired private ValidationProcessor processor;
     @Autowired private UserRepository userRepository;
     @Autowired private AvatarRepository avatarRepository;
     @Autowired private DailyMissionRepository dailyMissionRepository;
@@ -65,7 +65,7 @@ class ValidationConsumerTest {
                 .thenReturn(Optional.of(new ImageValidationContract.Result(
                         "APPROVED", List.of("Bicicleta reconhecida"), 0.9, "Comprova", "teste")));
 
-        assertThatCode(() -> consumer.consumir(new ValidationMessage(dados.validationId())))
+        assertThatCode(() -> processor.processar(dados.validationId()))
                 .doesNotThrowAnyException();
 
         assertThat(validationRepository.findById(dados.validationId()))
@@ -83,7 +83,7 @@ class ValidationConsumerTest {
                 .thenReturn(Optional.of(new ImageValidationContract.Result(
                         "APPROVED", List.of(), 0.9, null, "teste")));
 
-        consumer.consumir(new ValidationMessage(dados.validationId()));
+        processor.processar(dados.validationId());
 
         assertThat(userRepository.findById(dados.userId()).orElseThrow().getPoints())
                 .isGreaterThan(pontosAntes);
@@ -98,11 +98,11 @@ class ValidationConsumerTest {
                 .thenReturn(Optional.of(new ImageValidationContract.Result(
                         "APPROVED", List.of(), 0.9, null, "teste")));
 
-        consumer.consumir(new ValidationMessage(dados.validationId()));
+        processor.processar(dados.validationId());
         int depoisDaPrimeira = userRepository.findById(dados.userId()).orElseThrow().getPoints();
 
         // Reentrega: comportamento normal do RabbitMQ.
-        consumer.consumir(new ValidationMessage(dados.validationId()));
+        processor.processar(dados.validationId());
 
         assertThat(userRepository.findById(dados.userId()).orElseThrow().getPoints())
                 .isEqualTo(depoisDaPrimeira);

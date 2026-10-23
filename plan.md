@@ -493,14 +493,16 @@ Fontes da verificação: [bucket4j-spring-boot-starter — releases](https://git
 
 ## Migrations — numeração
 
-A última migration do `java-soulie` é a **V18**. Todas as novas entram a partir da V19, em `src/main/resources/db.migrations/` (pasta **com ponto**), sintaxe só Postgres:
+A última migration do `java-soulie` **antes desta integração** era a **V18**. A coleção de plantas do app ocupou a **V19** (`V19__user_plants.sql`). As migrations da pilha soul-up foram renumeradas para caber depois:
 
 | Versão | Conteúdo | Fase |
 |---|---|---|
-| `V19__soulup_legacy_alignment.sql` | o que as V12/V13 do `soulie-soul-up` faziam, renumerado: `missions.status` (o `avatars.experience` já veio na V12 do `java-soulie` como `xp` — conferir e não duplicar) | 2 |
-| `V20__validation_result_normalization.sql` | `validations.result_validation`: `APROVED` → `APPROVED`, `REJECT` → `REJECTED`; default `PENDING` | 2 |
-| `V21__evidence_ai_pipeline.sql` | `evidences`: `daily_mission_id`, `image_url`, `image_key`, `content_type`, `size_bytes`, `submitted_at`, `mission_id` passa a NULL, `CHECK` de exclusividade. `validations`: `detections`, `confidence`, `reason`, `provider`, `requested_at`, `resolved_at`, `attempts` | 4 |
-| `V22__social_follows.sql` | tabela `follows` com `UNIQUE(follower_id, followee_id)` e `CHECK(follower_id <> followee_id)` + índices nos dois sentidos | 5 |
+| `V19__user_plants.sql` | coleção de plantas do app (`user_plants`) | app |
+| `V20__missions_legacy_status.sql` | `missions.status` (legado soul-up) | 2 |
+| `V21__validation_result_normalization.sql` | `validations.result_validation`: `APROVED` → `APPROVED`, `REJECT` → `REJECTED`; default `PENDING` | 2 |
+| `V22__admin_role_reward_catalog_and_guards.sql` | catálogo de recompensas, débito atômico, papel ADMIN | 3b |
+| `V23__evidence_ai_pipeline.sql` | `evidences` + `validations` do pipeline de IA | 4 |
+| `V24__social_follows.sql` | tabela `follows` | 5 |
 
 Depois disso, regenerar (ou remover) `src/main/resources/db/soulie-schema.sql`, que hoje está parado na V12 e é uma segunda fonte de verdade.
 

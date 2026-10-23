@@ -9,7 +9,7 @@ import org.springframework.test.context.ActiveProfiles;
  * MapStruct e as cadeias de validators.
  *
  * <p>O {@code @ActiveProfiles("test")} é obrigatório. Sem ele o teste usaria o
- * perfil padrão ({@code prod}) e exigiria um PostgreSQL de verdade, mais as
+ * perfil padrão ({@code dev}) e exigiria um PostgreSQL de verdade, mais as
  * variáveis {@code DB_*} e {@code SECRET_JWT} no ambiente.
  */
 @SpringBootTest

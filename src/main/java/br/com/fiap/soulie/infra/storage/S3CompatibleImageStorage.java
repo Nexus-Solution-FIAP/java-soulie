@@ -2,6 +2,7 @@ package br.com.fiap.soulie.infra.storage;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
@@ -40,6 +41,7 @@ import java.util.UUID;
  * </ul>
  */
 @Component
+@ConditionalOnProperty(name = "soulie.storage.type", havingValue = "s3")
 public class S3CompatibleImageStorage implements ImageStorage {
 
     private static final Logger log = LoggerFactory.getLogger(S3CompatibleImageStorage.class);

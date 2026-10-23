@@ -1,8 +1,8 @@
 # Perfil de desenvolvimento. Ativo por padrão (spring.profiles.default: dev).
 #
 # As variáveis DB_* e SECRET_JWT continuam obrigatórias — veja .env.example.
-# Nenhuma delas tem valor padrão de propósito: é melhor falhar no boot que
-# subir apontando para um banco errado ou com um segredo previsível.
+# RabbitMQ e S3 NÃO são obrigatórios aqui: foto vai para disco e a validação
+# roda no mesmo processo (stub de aprovação se não houver API de IA).
 spring:
   jpa:
     show-sql: true
@@ -12,6 +12,23 @@ spring:
   flyway:
     # Em desenvolvimento, falhar cedo se uma migration já aplicada foi editada.
     validate-on-migrate: true
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
+
+soulie:
+  messaging:
+    enabled: false
+  storage:
+    type: local
+    local-dir: data/soulie-images
+  ai:
+    stub-approve: true
+    wait-timeout: PT6S
 
 logging:
   level:

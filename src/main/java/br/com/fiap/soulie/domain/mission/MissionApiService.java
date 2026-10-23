@@ -12,6 +12,7 @@ import br.com.fiap.soulie.domain.avatar.Avatar;
 import br.com.fiap.soulie.domain.evidence.EvidenceService;
 import br.com.fiap.soulie.domain.validation.Validation;
 import br.com.fiap.soulie.domain.validation.ValidationService;
+import br.com.fiap.soulie.infra.ai.AiValidationProperties;
 import br.com.fiap.soulie.infra.exception.BusinessException;
 import br.com.fiap.soulie.infra.messaging.ValidationPublisher;
 import br.com.fiap.soulie.domain.soulie.SoulieApiService;
@@ -60,6 +61,9 @@ public class MissionApiService {
     @Autowired
     @Lazy
     private ValidationService validationService;
+
+    @Autowired
+    private AiValidationProperties aiValidationProperties;
 
     @Transactional(readOnly = true)
     public List<DailyMissionResponse> daily(User user) {
@@ -114,8 +118,10 @@ public class MissionApiService {
         validationPublisher.exigirFilaDisponivel();
 
         var registrada = evidenceService.submitForDailyMission(user, mission, photo);
+        Long validationId = registrada.validation().getId();
 
-        return MissionValidationResponse.pendente(registrada.validation().getId(), mission.getId());
+        validationService.esperarVeredito(validationId, aiValidationProperties.getWaitTimeout());
+        return statusDaValidacao(user, validationId);
     }
 
     /**

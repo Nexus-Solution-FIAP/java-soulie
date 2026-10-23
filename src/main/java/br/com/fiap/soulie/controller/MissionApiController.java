@@ -43,14 +43,20 @@ public class MissionApiController {
             description = """
                     A foto agora é OBRIGATÓRIA e é analisada por IA antes de valer XP.
 
-                    Responde 202: a análise acontece em segundo plano. Guarde o `validationId` e                     consulte GET /v1/missions/validations/{id}, ou espere a notificação push —                     ela chega quando o resultado sai.
+                    Espera o veredito por alguns segundos: se a IA (ou o stub de dev)
+                    responder a tempo, devolve 200 com xpGained. Se o teto estourar,
+                    devolve 202 com validationId para consultar GET /v1/missions/validations/{id}.
 
                     Enquanto o status for PENDING, `xpGained` vem 0 e `success` vem false.                     Diárias só uma vez por dia; semanais, mensais e anuais só uma vez no período.""")
     public ResponseEntity<MissionValidationResponse> validate(
             @Parameter(hidden = true) @AuthenticationPrincipal User user,
             @Parameter(description = "Id da missão do dia", example = "2") @PathVariable Long id,
             @Parameter(description = "Foto que comprova a ação. Obrigatória.") @RequestPart("photo") MultipartFile photo) {
-        return ResponseEntity.accepted().body(missionApiService.validate(user, id, photo));
+        MissionValidationResponse body = missionApiService.validate(user, id, photo);
+        if ("PENDING".equals(body.status())) {
+            return ResponseEntity.accepted().body(body);
+        }
+        return ResponseEntity.ok(body);
     }
 
     @GetMapping("/validations/{id}")

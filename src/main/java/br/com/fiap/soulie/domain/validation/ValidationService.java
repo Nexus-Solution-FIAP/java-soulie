@@ -12,6 +12,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,6 +61,35 @@ public class ValidationService {
     public Validation findById(Long validationId) {
         return validationRepository.findById(validationId)
                 .orElseThrow(() -> new EntityNotFoundException("Validação não encontrada"));
+    }
+
+    /**
+     * Espera o veredito sair de PENDING, consultando o banco em transações curtas.
+     *
+     * <p>Sem transação aberta durante o sleep: uma conexão retida aqui esgotaria
+     * o pool enquanto a IA analisa. {@code PT0S} ou nulo desliga a espera.
+     *
+     * @return a validação resolvida, ou vazio se o teto estourou ainda PENDING
+     */
+    public Optional<Validation> esperarVeredito(Long validationId, Duration teto) {
+        if (validationId == null || teto == null || teto.isZero() || teto.isNegative()) {
+            return Optional.empty();
+        }
+        Instant deadline = Instant.now().plus(teto);
+        while (Instant.now().isBefore(deadline)) {
+            Validation atual = findById(validationId);
+            if (!atual.isPending()) {
+                return Optional.of(atual);
+            }
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException exception) {
+                Thread.currentThread().interrupt();
+                return Optional.empty();
+            }
+        }
+        Validation ultima = findById(validationId);
+        return ultima.isPending() ? Optional.empty() : Optional.of(ultima);
     }
 
     /**

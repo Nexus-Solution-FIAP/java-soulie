@@ -10,7 +10,7 @@ package br.com.fiap.soulie.domain.user.enums;
  *
  * <p>Não há rota para promover alguém a {@link #ADMIN}, de propósito — uma rota
  * assim seria o alvo óbvio de escalonamento de privilégio. O primeiro
- * administrador é promovido direto no banco; veja a migration V21.
+ * administrador é promovido direto no banco; veja a migration V22.
  */
 public enum UserRole {
 

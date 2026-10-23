@@ -18,7 +18,7 @@ import java.time.LocalDateTime;
  * resgatar qualquer benefício por 1 ponto.
  *
  * <p>Agora o cliente só informa qual item quer; o custo e o texto vêm daqui.
- * Itens são criados e editados direto no banco (veja a migration V21), que
+ * Itens são criados e editados direto no banco (veja a migration V22), que
  * semeia o catálogo inicial.
  */
 @Getter

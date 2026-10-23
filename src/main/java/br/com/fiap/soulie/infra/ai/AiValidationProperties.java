@@ -45,6 +45,18 @@ public class AiValidationProperties {
 
     private Duration readTimeout = Duration.ofSeconds(30);
 
+    /**
+     * Quanto o {@code POST /validate} espera o veredito antes de devolver 202.
+     * {@code PT0S} desliga a espera. Padrão 6s, para o app receber XP no 200.
+     */
+    private Duration waitTimeout = Duration.ofSeconds(6);
+
+    /**
+     * Sem URL de IA, aprova a foto localmente. Só para {@code dev}: em
+     * produção isso reabriria o bypass de XP.
+     */
+    private boolean stubApprove = false;
+
 
     public enum DeliveryMode {
         /** Manda uma URL temporária; funciona com bucket privado. */
@@ -77,5 +89,11 @@ public class AiValidationProperties {
 
     public Duration getReadTimeout() { return readTimeout; }
     public void setReadTimeout(Duration readTimeout) { this.readTimeout = readTimeout; }
+
+    public Duration getWaitTimeout() { return waitTimeout; }
+    public void setWaitTimeout(Duration waitTimeout) { this.waitTimeout = waitTimeout; }
+
+    public boolean isStubApprove() { return stubApprove; }
+    public void setStubApprove(boolean stubApprove) { this.stubApprove = stubApprove; }
 
 }

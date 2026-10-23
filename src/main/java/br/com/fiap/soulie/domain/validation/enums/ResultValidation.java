@@ -5,7 +5,7 @@ package br.com.fiap.soulie.domain.validation.enums;
  *
  * <p>No repositório {@code soulie-soul-up} os valores eram {@code APROVED}
  * (sem o segundo P) e {@code REJECT}, e a migration de lá gravava esses literais
- * no banco. A grafia foi corrigida aqui, junto com a migration V20 — ainda não
+ * no banco. A grafia foi corrigida aqui, junto com a migration V21 — ainda não
  * havia dado em produção preso à grafia errada.
  */
 public enum ResultValidation {

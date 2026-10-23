@@ -30,7 +30,7 @@ import java.time.LocalDateTime;
 @Entity(name = "Follow")
 @Table(
         name = "follows",
-        // Declarados também aqui, não só na migration V23. O schema dos testes
+        // Declarados também aqui, não só na migration V24. O schema dos testes
         // vem das ENTIDADES e o de produção vem das MIGRATIONS: restrição que
         // existe só de um lado não é exercitada por teste nenhum. Foi assim que
         // o primeiro teste do CHECK passou sem provar nada.

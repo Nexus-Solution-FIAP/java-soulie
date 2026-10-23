@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
  * {@link Mission} legada (vinda do {@code soulie-soul-up}, com {@code Action} e
  * status) e a {@link DailyMission} do catálogo que o contrato {@code /v1}
  * consome. Exatamente um dos dois vínculos é preenchido, e o banco garante isso
- * com o {@code CHECK} da migration V22 — sem ele, "exatamente um" seria uma
+ * com o {@code CHECK} da migration V23 — sem ele, "exatamente um" seria uma
  * convenção que alguém quebra sem perceber.
  *
  * <p><b>Ressalva que estava errada aqui:</b> o texto afirmava que aprovar a
