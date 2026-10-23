@@ -82,6 +82,17 @@ public class CommunityController {
         return ResponseEntity.ok(communityApiService.comment(user, id, request));
     }
 
+    @DeleteMapping("/feed/{id}")
+    @Operation(summary = "Apaga a própria publicação", description = "Só o autor pode apagar. Comentários e curtidas saem junto.")
+    @ApiResponse(responseCode = "204", description = "Publicação removida")
+    @ApiResponse(responseCode = "403", description = "A publicação é de outra pessoa")
+    @ApiResponse(responseCode = "404", description = "Publicação não encontrada")
+    public ResponseEntity<Void> deletePost(@Parameter(hidden = true) @AuthenticationPrincipal User user,
+                                           @Parameter(example = "8", description = "Id da publicação") @PathVariable Long id) {
+        communityApiService.deletePost(user, id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/garden")
     @Operation(summary = "Meu jardim compartilhado")
     @ApiResponse(responseCode = "200", description = "Jardim atual, com código de convite")

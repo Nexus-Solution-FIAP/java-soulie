@@ -22,6 +22,7 @@ import br.com.fiap.soulie.domain.soulie.SoulieLevel;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
 import br.com.fiap.soulie.infra.push.ExpoPushService;
+import br.com.fiap.soulie.validations.community.FeedPostDeletionValidator;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +74,9 @@ public class CommunityApiService {
 
     @Autowired
     private ExpoPushService expoPushService;
+
+    @Autowired
+    private List<FeedPostDeletionValidator> deletionValidators;
 
     @Transactional(readOnly = true)
     public List<RankingItemResponse> ranking(User current) {
@@ -159,6 +163,24 @@ public class CommunityApiService {
         FeedPost post = postInGarden(current, postId);
         FeedComment saved = feedCommentRepository.save(FeedComment.create(post, current, request.text()));
         return toComment(saved);
+    }
+
+    @Transactional
+    public void deletePost(User current, Long postId) {
+        FeedPost post = feedPostRepository.findById(postId)
+                .orElseThrow(() -> new EntityNotFoundException("Publicação não encontrada"));
+        boolean owner = post.getAuthor() != null && post.getAuthor().getId().equals(current.getId());
+        if (!owner) {
+            Garden garden = gardenService.findMine(current)
+                    .orElseThrow(() -> new EntityNotFoundException("Publicação não encontrada"));
+            if (post.getGarden() == null || !post.getGarden().getId().equals(garden.getId())) {
+                throw new EntityNotFoundException("Publicação não encontrada");
+            }
+            deletionValidators.forEach(validator -> validator.validate(post, current.getId()));
+        }
+        feedLikeRepository.deleteByPost_Id(post.getId());
+        feedCommentRepository.deleteByPost_Id(post.getId());
+        feedPostRepository.delete(post);
     }
 
     @Transactional
@@ -250,7 +272,8 @@ public class CommunityApiService {
                 liked,
                 post.getImageUri(),
                 post.getMissionName(),
-                post.getXp()
+                post.getXp(),
+                author.getId().equals(current.getId())
         );
     }
 

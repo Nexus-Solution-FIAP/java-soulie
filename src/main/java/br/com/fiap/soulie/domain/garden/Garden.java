@@ -35,6 +35,7 @@ public class Garden {
     private Set<User> users = new HashSet<>();
 
     public Garden() {
+        this.users = new HashSet<>();
     }
 
     public void addUserToGarden(User user) {
