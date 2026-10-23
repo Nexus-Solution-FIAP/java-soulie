@@ -13,7 +13,8 @@ public enum PlantType {
     RAINHA_DO_ABISMO(7, "Rainha-do-abismo", "Ganhou esse nome por brotar em paredões rochosos e beiras de precipícios. Guarda água e nutrientes num tubérculo lenhoso, o que a faz sobreviver na rocha quase sem terra. É endêmica dos afloramentos rochosos do Paraná."),
     TREVO_ROXO(8, "Trevo roxo", "O nome vem das três folhas em forma de coração, como as do trevo, e da cor arroxeada. Ao entardecer as folhas se dobram para baixo e se reabrem com o sol. Cresce em áreas abertas do Cerrado e do Sul e Sudeste."),
     MULUNGU(9, "Mulungu", "Mulungu é palavra de origem africana, trazida pelas línguas bantas ao português brasileiro. Suas flores vermelhas aparecem nos galhos desfolhados e espinhosos, e a casca é usada na medicina popular como calmante. Vive na Caatinga, no Cerrado e em matas do Sudeste."),
-    SUCUPIRA_PRETA(10, "Sucupira-preta", "Sucupira vem do tupi e se refere à madeira escura e pesadíssima; 'preta' distingue das demais sucupiras. Árvore de casca grossa resistente ao fogo, floresce em cachos roxo-azulados. Domina o Cerrado e aparece também na Caatinga e na Amazônia.");
+    SUCUPIRA_PRETA(10, "Sucupira-preta", "Sucupira vem do tupi e se refere à madeira escura e pesadíssima; 'preta' distingue das demais sucupiras. Árvore de casca grossa resistente ao fogo, floresce em cachos roxo-azulados. Domina o Cerrado e aparece também na Caatinga e na Amazônia."),
+    ARVORE_TECNOLOGICA(11, "Árvore Tecnológica", "Planta secreta do Soulie: uma árvore digital que mistura copa, circuito e código. Só aparece para quem conhece o código NEXT.");
 
     private final int id;
     private final String name;

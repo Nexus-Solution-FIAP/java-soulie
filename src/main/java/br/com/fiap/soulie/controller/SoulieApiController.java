@@ -34,7 +34,7 @@ public class SoulieApiController {
     }
 
     @PatchMapping
-    @Operation(summary = "Renomeia ou troca a planta", description = "Tipos: girassol, rosa, hibisco, lavanda, margarida, orquidea, ipe_amarelo, guaimbe_ondulado, manaca_da_serra, maranta, pacova, pitangueira, rainha_do_abismo, trevo_roxo, mulungu, sucupira_preta.")
+    @Operation(summary = "Renomeia ou troca a planta", description = "Tipos: girassol, rosa, hibisco, lavanda, margarida, orquidea, ipe_amarelo, guaimbe_ondulado, manaca_da_serra, maranta, pacova, pitangueira, rainha_do_abismo, trevo_roxo, mulungu, sucupira_preta, arvore_tecnologica.")
     public ResponseEntity<SoulieResponse> update(@Parameter(hidden = true) @AuthenticationPrincipal User user,
                                                  @RequestBody UpdateSoulieRequest request) {
         return ResponseEntity.ok(soulieApiService.update(user, request));
@@ -53,7 +53,7 @@ public class SoulieApiController {
     }
 
     @PostMapping("/plants/unlock-code")
-    @Operation(summary = "Libera uma planta com código", description = "Exemplos: ROSAFLORA, ORQUIDEA26.")
+    @Operation(summary = "Libera uma planta com código", description = "Exemplos: ROSAFLORA, ORQUIDEA26, NEXT.")
     public ResponseEntity<List<PlantItemResponse>> unlockCode(@Parameter(hidden = true) @AuthenticationPrincipal User user,
                                                               @RequestBody UnlockPlantCodeRequest request) {
         return ResponseEntity.ok(soulieApiService.redeemCode(user, request == null ? null : request.code()));

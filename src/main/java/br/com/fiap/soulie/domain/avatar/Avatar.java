@@ -124,6 +124,7 @@ public class Avatar {
             case TREVO_ROXO -> PlantType.TREVO_ROXO;
             case MULUNGU -> PlantType.MULUNGU;
             case SUCUPIRA_PRETA -> PlantType.SUCUPIRA_PRETA;
+            case ARVORE_TECNOLOGICA -> PlantType.ARVORE_TECNOLOGICA;
             default -> this.plantType == null ? PlantType.IPE_AMARELO : this.plantType;
         };
     }

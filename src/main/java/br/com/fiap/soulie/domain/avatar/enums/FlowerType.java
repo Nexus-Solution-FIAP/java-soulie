@@ -19,7 +19,8 @@ public enum FlowerType {
     RAINHA_DO_ABISMO("rainha_do_abismo"),
     TREVO_ROXO("trevo_roxo"),
     MULUNGU("mulungu"),
-    SUCUPIRA_PRETA("sucupira_preta");
+    SUCUPIRA_PRETA("sucupira_preta"),
+    ARVORE_TECNOLOGICA("arvore_tecnologica");
 
     private final String value;
 

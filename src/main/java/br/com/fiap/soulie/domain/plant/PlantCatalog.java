@@ -18,7 +18,8 @@ public enum PlantCatalog {
     HIBISCO(FlowerType.HIBISCO, "Hibisco", false, PlantUnlockKind.ACHIEVEMENTS, 10, null, "Desbloqueie 10 conquistas"),
     LAVANDA(FlowerType.LAVANDA, "Lavanda", false, PlantUnlockKind.MAX_PLANTS, 1, null, "Leve 1 planta ao nível máximo"),
     MARGARIDA(FlowerType.MARGARIDA, "Margarida", false, PlantUnlockKind.MISSIONS, 30, null, "Complete 30 missões"),
-    ORQUIDEA(FlowerType.ORQUIDEA, "Orquídea", false, PlantUnlockKind.SECRET_CODE, 0, "ORQUIDEA26", "Use um código secreto");
+    ORQUIDEA(FlowerType.ORQUIDEA, "Orquídea", false, PlantUnlockKind.SECRET_CODE, 0, "ORQUIDEA26", "Use um código secreto"),
+    ARVORE_TECNOLOGICA(FlowerType.ARVORE_TECNOLOGICA, "Árvore Tecnológica", false, PlantUnlockKind.SECRET_CODE, 0, "NEXT", "Use um código secreto");
 
     private final FlowerType flower;
     private final String label;
