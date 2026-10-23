@@ -146,11 +146,18 @@ saída.
 | Bucket fora do ar | 400 com mensagem genérica; o detalhe fica no log |
 | RabbitMQ fora **antes** de gravar | 503, nada é gravado |
 | RabbitMQ fora **na publicação** | A evidência está salva e `PENDING`. Nada se perde, mas precisa ser reenfileirada. Ver `docs/08-operacao.md` |
-| IA não responde | Retry com espera crescente (4 tentativas). Esgotado → DLQ → `FAILED` |
+| IA não responde | Retry com espera crescente (4 tentativas). Esgotado → DLQ, e o consumidor da DLQ resolve como `FAILED` |
 | IA responde algo inesperado | `FAILED`, não `REJECTED` |
 | Mensagem reentregue | Ignorada: a validação já não está `PENDING` |
 | Webhook com assinatura errada | 401 |
 | Webhook repetido | Idempotente: não credita duas vezes |
+
+A DLQ **tem consumidor** (`ValidationDeadLetterConsumer`), e isso é uma correção:
+antes esta página afirmava "esgotado → DLQ → `FAILED`" e **a transição para
+`FAILED` não existia em lugar nenhum**. A validação ficava `PENDING` para sempre,
+e como pendência bloqueia reenvio, a missão do usuário ficava trancada
+permanentemente — dez minutos de indisponibilidade da IA bastavam, sem
+notificação e com saída só por `UPDATE` manual.
 
 A **DLQ não tem TTL**, de propósito: o que cai lá é trabalho de uma pessoa real
 que fez a ação e não conseguiu ser analisada. Expirar essas mensagens seria
@@ -170,9 +177,13 @@ preenchidos.
 | — | `GET /v1/missions/validations/{id}` para consultar |
 | — | Push quando o resultado sai |
 
-Um cliente antigo continua desserializando normalmente e lê `xpGained: 0`. A
-configuração `soulie.ai.mode: sync` existe para o app poder migrar sem quebrar
-de uma vez.
+Um cliente antigo continua desserializando normalmente e lê `xpGained: 0`.
+
+> **Correção.** Esta seção prometia uma configuração `soulie.ai.mode: sync` para
+> o app "migrar sem quebrar de uma vez". **Ela nunca existiu de verdade:** a
+> propriedade estava declarada e não era lida por nenhuma linha do projeto, então
+> definir `SYNC` não mudava comportamento nenhum. Foi removida, junto com a
+> variável de ambiente. O fluxo é sempre assíncrono.
 
 ## Configuração
 

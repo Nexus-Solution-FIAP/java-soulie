@@ -109,7 +109,6 @@ soulie:
     # Análise de imagem é lenta. Mas o limite tem de existir: sem ele, um worker
     # fica preso para sempre numa IA que não responde.
     read-timeout: "${AI_READ_TIMEOUT:PT30S}"
-    mode: "${VALIDATION_MODE:ASYNC}"
     # Desligado por padrão. Só ligue se a IA do parceiro responder depois, em
     # vez de na própria chamada — um endpoint público a mais que ninguém usa é
     # só superfície de ataque.

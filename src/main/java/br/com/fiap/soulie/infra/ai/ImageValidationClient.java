@@ -68,9 +68,15 @@ public class ImageValidationClient {
             return Optional.empty();
         }
 
-        var request = montarRequisicao(validationId, imageKey, contentType, mission, callbackUrl);
-
         try {
+            // montarRequisicao DENTRO do try: ele gera a URL assinada, e para
+            // evidencia do fluxo legado o imageKey e nulo -- o SDK lancava
+            // "Parameter Key must not be null" e a excecao escapava deste
+            // metodo, consumindo as 4 tentativas e indo para a DLQ sem nunca
+            // chamar a IA. Dentro do try, isso virou um Optional vazio, que o
+            // consumidor trata como falha de analise.
+            var request = montarRequisicao(validationId, imageKey, contentType, mission, callbackUrl);
+
             var resultado = client.post()
                     .uri(properties.getUrl())
                     .headers(headers -> {
@@ -88,8 +94,10 @@ public class ImageValidationClient {
             }
             return Optional.of(resultado);
         } catch (Exception exception) {
-            // Sem a mensagem da exceção no nível de erro: ela pode conter a URL
-            // com a chave de API. O detalhe fica no debug.
+            // Sem a mensagem da exceção no nível de erro: ela costuma trazer a URL
+            // chamada, e com ela a URL assinada da foto de uma pessoa. A chave de
+            // API vai no cabeçalho Authorization, nunca na URL. O detalhe fica no
+            // debug.
             log.warn("Falha ao chamar a IA para a validação {}: {}",
                     validationId, exception.getClass().getSimpleName());
             log.debug("Detalhe da falha na validação {}", validationId, exception);

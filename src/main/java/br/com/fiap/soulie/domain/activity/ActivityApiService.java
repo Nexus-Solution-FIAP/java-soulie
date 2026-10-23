@@ -38,6 +38,15 @@ public class ActivityApiService {
                 .toList();
     }
 
+    /**
+     * Teto de XP por dia vindo de atividade livre.
+     *
+     * <p>50 e o XP da missao diaria mais valiosa: atividade livre, que nao tem
+     * comprovacao nenhuma, nao deve render mais que um dia inteiro de missao
+     * validada por IA.
+     */
+    private static final int TETO_DIARIO_DE_XP_LIVRE = 50;
+
     @Transactional
     public ActivityResponse create(User user, CreateActivityRequest request) {
         if (request == null || request.label() == null || request.label().isBlank()) {
@@ -59,8 +68,18 @@ public class ActivityApiService {
                             .formatted(missaoMencionada.get().getName(), missaoMencionada.get().getId()));
         }
 
-        int xp = request.xp() == null ? 0 : request.xp();
         LocalDateTime now = LocalDateTime.now();
+
+        // O TETO E DIARIO E AGREGADO, nao por requisicao. O @Max(50) do DTO
+        // limita uma chamada; o numero de chamadas nunca foi limitado, e por
+        // isso a correcao anterior nao fechou nada: medido, 5 chamadas de 50
+        // davam 250 pontos, com nivel, streak e conquista. O cliente continua
+        // podendo PEDIR xp, mas quem decide quanto entra e o servidor.
+        int pedido = request.xp() == null ? 0 : Math.max(request.xp(), 0);
+        int jaConcedidoHoje = activityRepository.somaXpNaJanela(
+                user.getId(), now.toLocalDate().atStartOfDay(), now.toLocalDate().plusDays(1).atStartOfDay());
+        int xp = Math.max(Math.min(pedido, TETO_DIARIO_DE_XP_LIVRE - jaConcedidoHoje), 0);
+
         if (xp > 0) {
             var avatar = soulieApiService.getOrCreate(user);
             user.addPoints(xp);
@@ -68,6 +87,9 @@ public class ActivityApiService {
             user.registerActivityDay(now.toLocalDate());
             achievementApiService.sync(user, avatar);
         }
+        // Grava o XP CONCEDIDO, nao o pedido: a resposta precisa dizer a verdade,
+        // senao o app mostra um numero que o saldo nao tem -- e a soma do dia,
+        // que e lida daqui, ficaria errada na proxima chamada.
         UserActivity activity = activityRepository.save(UserActivity.of(user, request.emoji(), request.label().trim(), xp, now));
         return toResponse(activity);
     }

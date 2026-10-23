@@ -35,4 +35,15 @@ public interface ImageStorage {
 
     /** Busca os bytes, para quando a IA precisar receber o arquivo em vez da URL. */
     byte[] read(String key);
+
+    /**
+     * Remove o objeto, sem deixar a falha da remocao derrubar o fluxo.
+     *
+     * <p>Serve para um caso especifico: a imagem subiu e a escrita no banco
+     * falhou depois. Sem isto o objeto ficava no bucket orfao, pago e sem
+     * nenhuma referencia que permitisse encontra-lo. Como quem chama ja esta
+     * tratando um erro, falhar aqui tambem so trocaria uma excecao por outra —
+     * entao a falha vai para o log e o erro original segue.
+     */
+    void deleteQuietly(String key);
 }

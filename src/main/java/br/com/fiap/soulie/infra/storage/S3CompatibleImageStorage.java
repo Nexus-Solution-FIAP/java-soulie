@@ -6,14 +6,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.http.urlconnection.UrlConnectionHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
-import software.amazon.awssdk.services.s3.model.S3Exception;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
@@ -63,7 +64,17 @@ public class S3CompatibleImageStorage implements ImageStorage {
                 .region(regiao)
                 .credentialsProvider(credenciais)
                 .serviceConfiguration(configuracao)
-                .httpClient(UrlConnectionHttpClient.builder().build())
+                // Timeouts explícitos, como manda a regra da casa para chamada
+                // externa: o default do SDK vale para connect e read, mas sem
+                // apiCallTimeout os 3 retries internos somam e uma requisição
+                // pode segurar recurso por perto de um minuto e meio.
+                .httpClient(UrlConnectionHttpClient.builder()
+                        .connectionTimeout(Duration.ofSeconds(5))
+                        .socketTimeout(Duration.ofSeconds(20))
+                        .build())
+                .overrideConfiguration(o -> o
+                        .apiCallTimeout(Duration.ofSeconds(30))
+                        .apiCallAttemptTimeout(Duration.ofSeconds(20)))
                 .build();
 
         this.presigner = S3Presigner.builder()
@@ -93,7 +104,18 @@ public class S3CompatibleImageStorage implements ImageStorage {
         // O tipo vem dos MAGIC BYTES, nunca do cabeçalho enviado pelo cliente.
         var tipo = ImageType.detectar(conteudo)
                 .orElseThrow(() -> new ImageStorageException(
-                        "O arquivo enviado não é uma imagem válida (aceitos: JPEG, PNG, GIF, WEBP)"));
+                        "O arquivo enviado não é uma imagem válida (aceitos: JPEG, PNG, WEBP)"));
+
+        // Reescreve a imagem a partir da estrutura dela. Isto remove o EXIF --
+        // onde a câmera grava GPS, horário e modelo do aparelho -- e descarta
+        // qualquer coisa colada depois do fim declarado do arquivo. Os dois
+        // importam porque este arquivo sai do nosso controle: vai para a IA do
+        // parceiro por URL assinada.
+        conteudo = ImageSanitizer.limpar(conteudo, tipo);
+        if (conteudo == null) {
+            throw new ImageStorageException(
+                    "A imagem enviada está corrompida ou tem formato inesperado");
+        }
 
         // Chave gerada pelo servidor. Nunca file.getOriginalFilename(): aquele
         // valor vem do cliente e permitiria path traversal e sobrescrever a foto
@@ -109,9 +131,12 @@ public class S3CompatibleImageStorage implements ImageStorage {
                             .contentLength((long) conteudo.length)
                             .build(),
                     RequestBody.fromBytes(conteudo));
-        } catch (S3Exception exception) {
-            // A mensagem do SDK pode trazer detalhe do bucket e da conta: fica no
-            // log do servidor, não na resposta.
+        } catch (SdkException exception) {
+            // SdkException e nao S3Exception: DNS, timeout de conexao e falha de
+            // TLS sao SdkClientException, que NAO e S3Exception. Capturando so a
+            // segunda, bucket inacessivel virava 500 com correlationId -- e a
+            // documentacao prometia 400. A mensagem do SDK pode trazer detalhe do
+            // bucket e da conta, entao fica no log, nao na resposta.
             log.error("Falha ao enviar imagem para o bucket", exception);
             throw new ImageStorageException("Não foi possível guardar a imagem agora");
         }
@@ -138,9 +163,27 @@ public class S3CompatibleImageStorage implements ImageStorage {
                     .bucket(properties.getBucket())
                     .key(key)
                     .build()).asByteArray();
-        } catch (S3Exception exception) {
+        } catch (SdkException exception) {
             log.error("Falha ao ler imagem do bucket", exception);
             throw new ImageStorageException("Não foi possível ler a imagem");
+        }
+    }
+
+    @Override
+    public void deleteQuietly(String key) {
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        try {
+            client.deleteObject(DeleteObjectRequest.builder()
+                    .bucket(properties.getBucket())
+                    .key(key)
+                    .build());
+        } catch (SdkException exception) {
+            // So log: quem chama esta tratando um erro anterior, e trocar a
+            // excecao dele pela desta esconderia a causa real. O objeto fica
+            // orfao e a regra de ciclo de vida do bucket cuida dele.
+            log.error("Nao foi possivel remover o objeto orfao {}", key, exception);
         }
     }
 
