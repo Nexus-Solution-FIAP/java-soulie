@@ -45,12 +45,6 @@ public class AiValidationProperties {
 
     private Duration readTimeout = Duration.ofSeconds(30);
 
-    /**
-     * {@code async} responde 202 e credita o XP depois da IA aprovar;
-     * {@code sync} credita na própria requisição. O modo síncrono existe para o
-     * app do parceiro poder migrar sem quebrar de uma vez.
-     */
-    private Mode mode = Mode.ASYNC;
 
     public enum DeliveryMode {
         /** Manda uma URL temporária; funciona com bucket privado. */
@@ -59,7 +53,6 @@ public class AiValidationProperties {
         BYTES
     }
 
-    public enum Mode { ASYNC, SYNC }
 
     public String getUrl() { return url; }
     public void setUrl(String url) { this.url = url; }
@@ -85,6 +78,4 @@ public class AiValidationProperties {
     public Duration getReadTimeout() { return readTimeout; }
     public void setReadTimeout(Duration readTimeout) { this.readTimeout = readTimeout; }
 
-    public Mode getMode() { return mode; }
-    public void setMode(Mode mode) { this.mode = mode; }
 }

@@ -37,6 +37,9 @@ public class EvidenceService {
     private ValidationService validationService;
 
     @Autowired
+    private EvidenceSubmissionGuard guardas;
+
+    @Autowired
     private List<EvidenceSubmissionValidator> submissionValidators;
 
     @Autowired
@@ -91,30 +94,42 @@ public class EvidenceService {
      * hora. A ordem inversa deixaria evidências apontando para objetos
      * inexistentes.
      */
-    @Transactional
+    /**
+     * NAO e {@code @Transactional}, e isso e a correcao de um defeito real.
+     *
+     * <p>A versao anterior era transacional e o upload de ate 10MB para o bucket
+     * rodava <b>dentro</b> da transacao — enquanto um comentario em
+     * {@code MissionApiService} afirmava o contrario, que "as escritas ficam em
+     * transacoes curtas". A primeira instrucao adquiria a conexao, e ela ficava
+     * retida durante o PUT no S3. Dez requisicoes concorrentes de 10MB com
+     * upstream lento retinham as 10 conexoes do pool padrao, e a 11a requisicao
+     * <b>de qualquer endpoint, inclusive o login</b>, esperava o
+     * {@code connectionTimeout} e falhava.
+     *
+     * <p>Agora as leituras de guarda e a escrita sao transacoes curtas, com o
+     * upload entre elas e fora de qualquer uma.
+     */
     public EvidenciaRegistrada submitForDailyMission(User user, DailyMission mission, MultipartFile photo) {
-        // Uma evidência pendente por vez, por missão. Sem isto, um usuário em
-        // laço gera N uploads de 10MB e N chamadas PAGAS à IA — custo de
-        // armazenamento e de API de terceiro na conta do projeto. É o
-        // equivalente ao NoPendingEvidenceValidator do fluxo legado, que não
-        // alcança aqui porque aquela cadeia tipa Mission, não DailyMission.
-        if (evidenceRepository.existsPendingForDailyMission(user.getId(), mission.getId())) {
-            throw new ValidationException(
-                    "Você já tem uma foto desta missão em análise. Aguarde o resultado.");
-        }
+        guardas.conferirSePodeEnviar(user, mission);
 
         StoredImage imagem;
         try {
             imagem = imageStorage.store(photo, "evidencias");
         } catch (ImageStorageException exception) {
-            // A mensagem aqui é sobre o arquivo que o usuário mandou, então pode
-            // ir para ele: "não é uma imagem válida", "excede o tamanho".
+            // A mensagem aqui e sobre o arquivo que o usuario mandou, entao pode
+            // ir para ele: "nao e uma imagem valida", "excede o tamanho".
             throw new ValidationException(exception.getMessage());
         }
 
-        var evidence = evidenceRepository.save(Evidence.doAppParaMissaoDiaria(user, mission, imagem));
-        var validation = validationService.createPending(evidence);
-        return new EvidenciaRegistrada(evidence, validation);
+        try {
+            return guardas.registrarPendente(user, mission, imagem);
+        } catch (RuntimeException exception) {
+            // A imagem ja esta no bucket e a linha nao entrou: sem isto o objeto
+            // ficaria orfao, pago e sem nenhuma referencia que permitisse
+            // encontra-lo depois.
+            imageStorage.deleteQuietly(imagem.key());
+            throw exception;
+        }
     }
 
     /** Evidência recém-registrada e a validação PENDING criada para ela. */

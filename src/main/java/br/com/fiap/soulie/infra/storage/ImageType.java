@@ -13,12 +13,17 @@ import java.util.Optional;
  *
  * <p>SVG fica deliberadamente de fora: é XML, pode conter script, e seria
  * armazenado e depois servido ao app.
+ *
+ * <p><b>GIF saiu</b> quando o {@link ImageSanitizer} entrou. Nenhuma câmera
+ * produz GIF para comprovar uma ação, e manter o formato exigiria um quarto
+ * parser de estrutura só para ele — ou deixá-lo como o único caminho que escapa
+ * da remoção de metadados e da poda da cauda. Menos formato aceito é menos
+ * superfície.
  */
 public enum ImageType {
 
     JPEG("image/jpeg", ".jpg", new int[]{0xFF, 0xD8, 0xFF}),
     PNG("image/png", ".png", new int[]{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}),
-    GIF("image/gif", ".gif", new int[]{0x47, 0x49, 0x46, 0x38}),
     // WEBP é um contêiner RIFF: "RIFF" nos bytes 0-3 e "WEBP" nos 8-11.
     WEBP("image/webp", ".webp", new int[]{0x52, 0x49, 0x46, 0x46});
 

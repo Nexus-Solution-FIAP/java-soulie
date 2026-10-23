@@ -24,8 +24,17 @@ import java.time.LocalDateTime;
  * com o {@code CHECK} da migration V22 — sem ele, "exatamente um" seria uma
  * convenção que alguém quebra sem perceber.
  *
- * <p>Com um pipeline só alimentando os dois, aprovar a evidência destrava o
- * {@code PUT /mission/{id}/complete} legado e credita a recompensa do
+ * <p><b>Ressalva que estava errada aqui:</b> o texto afirmava que aprovar a
+ * evidência destrava o {@code PUT /mission/{id}/complete} legado. Não destrava,
+ * porque a evidência legada guarda uma URL e não uma chave do bucket, e o
+ * cliente da IA precisa da chave para gerar a URL assinada — então a validação
+ * do fluxo legado nunca chega a {@code APPROVED} e o
+ * {@code ApprovedEvidenceValidator} continua barrando. Levar a URL do cliente
+ * para a IA seria SSRF com saída, então fazer o legado funcionar exige decidir
+ * primeiro de onde vem aquela imagem. Está registrado como pendência.
+ *
+ * <p>O que o pipeline de fato alimenta hoje é o fluxo do app: aprovar credita a
+ * recompensa do
  * {@code /v1}.
  */
 @Getter
