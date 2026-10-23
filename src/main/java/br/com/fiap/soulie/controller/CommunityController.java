@@ -21,6 +21,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -55,7 +56,7 @@ public class CommunityController {
     @PostMapping("/feed")
     @Operation(summary = "Publica no feed")
     public ResponseEntity<FeedPostResponse> publish(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                    @RequestBody CreateFeedRequest request) {
+                                                    @RequestBody @Valid CreateFeedRequest request) {
         return ResponseEntity.ok(communityApiService.publish(user, request));
     }
 
@@ -77,7 +78,7 @@ public class CommunityController {
     @Operation(summary = "Comenta uma publicação")
     public ResponseEntity<FeedCommentResponse> comment(@Parameter(hidden = true) @AuthenticationPrincipal User user,
                                                        @Parameter(example = "8") @PathVariable Long id,
-                                                       @RequestBody CreateCommentRequest request) {
+                                                       @RequestBody @Valid CreateCommentRequest request) {
         return ResponseEntity.ok(communityApiService.comment(user, id, request));
     }
 
@@ -100,7 +101,7 @@ public class CommunityController {
     @PostMapping("/garden/join")
     @Operation(summary = "Entra em um jardim pelo código")
     public ResponseEntity<CommunityGardenResponse> joinGarden(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                              @RequestBody(required = false) JoinGardenRequest request) {
+                                                              @RequestBody(required = false) @Valid JoinGardenRequest request) {
         return ResponseEntity.ok(gardenService.join(user, request == null ? null : request.code()));
     }
 
@@ -120,7 +121,7 @@ public class CommunityController {
 
     @PostMapping("/nudges")
     @Operation(summary = "Lembra um amigo da sequência", description = "Há um limite diário de lembretes. A pessoa recebe uma notificação.")
-    public ResponseEntity<NudgeResponse> nudge(@Parameter(hidden = true) @AuthenticationPrincipal User user, @RequestBody NudgeRequest request) {
+    public ResponseEntity<NudgeResponse> nudge(@Parameter(hidden = true) @AuthenticationPrincipal User user, @RequestBody @Valid NudgeRequest request) {
         return ResponseEntity.ok(communityApiService.nudge(user, request == null ? null : request.userId()));
     }
 
@@ -134,7 +135,7 @@ public class CommunityController {
     @Operation(summary = "Marca notificações como lidas")
     @ApiResponse(responseCode = "204", description = "Ids informados foram removidos da lista")
     public ResponseEntity<Void> readNotifications(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                  @RequestBody ReadNotificationsRequest request) {
+                                                  @RequestBody @Valid ReadNotificationsRequest request) {
         communityApiService.markNotificationsRead(user, request == null ? List.of() : request.ids());
         return ResponseEntity.noContent().build();
     }

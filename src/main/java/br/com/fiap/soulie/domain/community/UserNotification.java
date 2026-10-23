@@ -44,6 +44,22 @@ public class UserNotification {
         return notification;
     }
 
+    /**
+     * Notificação gerada pelo próprio sistema, sem outro usuário envolvido.
+     *
+     * <p>É por aqui que o resultado da validação de imagem chega ao usuário: a
+     * análise acontece depois da requisição, então não há como avisar na
+     * resposta.
+     */
+    public static UserNotification system(User receiver, String title, String body) {
+        var notification = new UserNotification();
+        notification.user = receiver;
+        notification.title = title;
+        notification.body = body;
+        notification.createdAt = LocalDateTime.now();
+        return notification;
+    }
+
     public void markRead(LocalDateTime when) {
         if (readAt == null) {
             readAt = when;

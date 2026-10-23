@@ -39,10 +39,29 @@ public class MissionApiController {
     }
 
     @PostMapping(value = "/{id}/validate", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @Operation(summary = "Conclui a missão com foto", description = "A foto é opcional. A primeira conclusão do dia soma 1 na sequência e devolve o XP da missão. Diárias só uma vez por dia; semanais, mensais e anuais só uma vez no período.")
-    public ResponseEntity<MissionValidationResponse> validate(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                              @Parameter(description = "Id da missão do dia", example = "2") @PathVariable Long id,
-                                                              @Parameter(description = "Foto da ação. Pode ir vazio.") @RequestPart(value = "photo", required = false) MultipartFile photo) {
-        return ResponseEntity.ok(missionApiService.validate(user, id, photo));
+    @Operation(summary = "Envia a foto da missão para validação",
+            description = """
+                    A foto agora é OBRIGATÓRIA e é analisada por IA antes de valer XP.
+
+                    Responde 202: a análise acontece em segundo plano. Guarde o `validationId` e                     consulte GET /v1/missions/validations/{id}, ou espere a notificação push —                     ela chega quando o resultado sai.
+
+                    Enquanto o status for PENDING, `xpGained` vem 0 e `success` vem false.                     Diárias só uma vez por dia; semanais, mensais e anuais só uma vez no período.""")
+    public ResponseEntity<MissionValidationResponse> validate(
+            @Parameter(hidden = true) @AuthenticationPrincipal User user,
+            @Parameter(description = "Id da missão do dia", example = "2") @PathVariable Long id,
+            @Parameter(description = "Foto que comprova a ação. Obrigatória.") @RequestPart("photo") MultipartFile photo) {
+        return ResponseEntity.accepted().body(missionApiService.validate(user, id, photo));
+    }
+
+    @GetMapping("/validations/{id}")
+    @Operation(summary = "Status de uma validação",
+            description = """
+                    Consulta o resultado da análise da foto. Enquanto `status` for PENDING,                     a IA ainda não respondeu.
+
+                    APPROVED: o XP já foi creditado e os campos de recompensa estão preenchidos.                     REJECTED: a foto não comprova a missão; o motivo vem em `aiDetections`.                     FAILED: não foi possível analisar — é falha nossa, a evidência será reprocessada.""")
+    public ResponseEntity<MissionValidationResponse> validationStatus(
+            @Parameter(hidden = true) @AuthenticationPrincipal User user,
+            @Parameter(description = "Id devolvido no envio da foto", example = "42") @PathVariable Long id) {
+        return ResponseEntity.ok(missionApiService.statusDaValidacao(user, id));
     }
 }

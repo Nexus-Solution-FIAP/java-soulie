@@ -1,7 +1,9 @@
 package br.com.fiap.soulie.domain.user;
 
 import br.com.fiap.soulie.domain.garden.Garden;
+import br.com.fiap.soulie.infra.exception.BusinessException;
 import br.com.fiap.soulie.domain.user.dto.UpdateUserData;
+import br.com.fiap.soulie.domain.user.enums.UserRole;
 import br.com.fiap.soulie.domain.user.dto.UserRequest;
 import jakarta.persistence.*;
 import jakarta.validation.Valid;
@@ -18,6 +20,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 @Getter
 @Setter
 @EqualsAndHashCode(of = "id")
@@ -34,6 +39,11 @@ public class User implements UserDetails {
     private String password;
     private int points;
     private Boolean active;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserRole role = UserRole.USER;
 
     private String handle;
 
@@ -70,26 +80,44 @@ public class User implements UserDetails {
     @Column(name = "show_full_name")
     private Boolean showFullName;
 
+    @Builder.Default
     @ManyToMany(mappedBy = "users")
     private Set<Garden> gardens = new HashSet<>();
 
-    public User() {
-    }
 
+    /**
+     * Atualiza nome e e-mail. **Não mexe em senha de propósito.**
+     *
+     * <p>A versão anterior atribuía {@code updateUserData.password()} direto no
+     * campo, sem passar pelo encoder — ou seja, {@code PUT /user} gravava a senha
+     * em texto puro no banco, ao contrário do cadastro. Além de expor a
+     * credencial num eventual dump, travava o usuário fora da conta, porque o
+     * BCrypt nunca casa com um valor não criptografado.
+     *
+     * <p>Troca de senha agora é operação própria: {@link #changePassword}.
+     */
     public void updateData(@Valid UpdateUserData updateUserData) {
-        if(updateUserData.name() != null ){
+        if (updateUserData.name() != null && !updateUserData.name().isBlank()) {
             this.name = updateUserData.name();
         }
 
-        if(updateUserData.email() != null){
+        if (updateUserData.email() != null && !updateUserData.email().isBlank()) {
             this.email = updateUserData.email();
         }
+    }
 
-        // Aqui precisa passar por uma validação,
-        // o usuário não pode simplesmente mudar a senha quando ele quiser.
-        if(updateUserData.password() != null){
-            this.password = updateUserData.password();
+    /**
+     * Troca a senha, sempre criptografada.
+     *
+     * <p>Pendência conhecida, registrada em {@code docs/07-seguranca.md}: o fluxo
+     * ideal exigiria a senha atual antes de aceitar a nova. Hoje basta estar
+     * autenticado, então um token roubado permite trocar a senha e tomar a conta.
+     */
+    public void changePassword(String rawPassword, PasswordEncoder passwordEncoder) {
+        if (rawPassword == null || rawPassword.isBlank()) {
+            return;
         }
+        this.password = passwordEncoder.encode(rawPassword);
     }
 
     public void deleteUser() {
@@ -138,6 +166,29 @@ public class User implements UserDetails {
         }
     }
 
+    /**
+     * Gasta pontos no resgate de uma recompensa.
+     *
+     * <p><b>Esta guarda NÃO resolve corrida.</b> Ela impede saldo negativo
+     * dentro de uma transação, mas duas transações simultâneas leem o mesmo
+     * saldo, as duas passam por aqui e as duas gravam — gastando o mesmo saldo
+     * duas vezes. Quem resolve isso é o débito atômico em
+     * {@code UserRepository.debitPoints}, que o {@code RewardService} usa, mais
+     * o {@code CHECK (points >= 0)} da migration V21.
+     *
+     * <p>Mantida como última linha de defesa para quem manipular a entidade
+     * fora daquele caminho.
+     */
+    public void spendPoints(int amount) {
+        if (amount <= 0) {
+            throw new BusinessException("A quantidade de pontos a gastar deve ser positiva");
+        }
+        if (amount > this.points) {
+            throw BusinessException.conflito("Saldo de pontos insuficiente");
+        }
+        this.points -= amount;
+    }
+
     public void addImpact(double co2, double water) {
         if (co2 > 0) {
             this.co2SavedKg += co2;
@@ -177,6 +228,9 @@ public class User implements UserDetails {
         if (active == null) {
             active = true;
         }
+        if (role == null) {
+            role = UserRole.USER;
+        }
         if (notificationsEnabled == null) {
             notificationsEnabled = true;
         }
@@ -193,7 +247,15 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_USER"));
+        // Antes isto era ROLE_USER fixo, o que tornava inútil o
+        // @EnableMethodSecurity e deixava as operações de catálogo abertas a
+        // qualquer autenticado.
+        UserRole papel = role == null ? UserRole.USER : role;
+        return List.of(new SimpleGrantedAuthority(papel.authority()));
+    }
+
+    public boolean isAdmin() {
+        return role == UserRole.ADMIN;
     }
 
     @Override

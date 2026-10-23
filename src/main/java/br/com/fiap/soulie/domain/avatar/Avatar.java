@@ -18,6 +18,8 @@ import java.time.LocalDateTime;
 @Getter
 @Setter
 @EqualsAndHashCode
+@Builder
+@AllArgsConstructor
 @Entity(name = "Avatar")
 @Table(name = "avatars")
 public class Avatar {

@@ -53,7 +53,13 @@ public class SoulieApiService {
                 try {
                     plantCollectionService.activate(user, avatar, FlowerType.from(request.flowerType()));
                 } catch (IllegalArgumentException exception) {
-                    throw new ValidationException(exception.getMessage());
+                    // Mensagem literal, não a da exceção. Hoje FlowerType.from só
+                    // devolve "Flor inválida: <entrada do próprio usuário>", mas
+                    // repassar getMessage() é o mesmo padrão que removemos do
+                    // ErrorHandler: no dia que o from() passar a usar
+                    // Enum.valueOf, o corpo da resposta viraria
+                    // "No enum constant br.com.fiap.soulie...".
+                    throw new ValidationException("Tipo de flor inválido");
                 }
             }
         }

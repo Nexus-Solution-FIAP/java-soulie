@@ -8,6 +8,8 @@ import org.mapstruct.Mapping;
 @Mapper(componentModel = "spring")
 public interface UserMapper {
 
+    // O nome vem de publicName(), que respeita o showFullName do usuário.
+    @Mapping(target = "name", expression = "java(user.publicName())")
     UserResponse toDetail(User user);
 
     @Mapping(target = "id", ignore = true)

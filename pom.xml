@@ -29,8 +29,103 @@
     <properties>
         <java.version>21</java.version>
         <org.mapstruct.version>1.6.3</org.mapstruct.version>
+        <awssdk.version>2.49.6</awssdk.version>
+        <bucket4j.version>8.21.0</bucket4j.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!--
+                O AWS SDK NAO e gerenciado pelo BOM do Spring Boot (conferido no
+                spring-boot-dependencies-4.1.1.pom). Sem este BOM proprio, cada
+                artefato do SDK precisaria de versao propria aqui, e elas acabariam
+                divergindo entre si.
+            -->
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
     <dependencies>
+        <!--
+            RabbitMQ. No Spring Boot 4.1 o artefato correto ainda e
+            spring-boot-starter-amqp: o rename para spring-boot-starter-rabbitmq
+            entrou no 4.1.0-M3, foi REVERTIDO no M4 e esta reagendado para o 4.2.
+            Conferido: o -amqp existe no Central para a 4.1.1 e o -rabbitmq da 404.
+            A configuracao segue no namespace spring.rabbitmq.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!--
+            Redis para o rate limit distribuido. OPCIONAL em runtime: se nao
+            houver Redis configurado ou ele cair, o limite degrada para memoria
+            por instancia (ver infra/ratelimit). O starter continua se chamando
+            spring-boot-starter-data-redis no Boot 4.1 (conferido no Central).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+
+        <!--
+            Bucket4j: o algoritmo de token bucket.
+            NAO usamos o bucket4j-spring-boot-starter (autoconfiguracao): a
+            ultima release dele e contra Boot 4.0.3 e nao ha release para 4.1.x.
+            De todo modo precisamos de filtro proprio, porque os limites sao por
+            rota e por identidade (usuario autenticado vs IP real do Cloudflare).
+
+            So o -core entra. O modulo -lettuce esteve aqui com um paragrafo
+            justificando a versao do Lettuce dele, e NENHUMA classe o importava:
+            o caminho do Redis e script Lua sobre StringRedisTemplate, e do
+            Bucket4j usamos Bandwidth, Bucket e ConsumptionProbe, todos no store
+            em memoria. Dependencia morta e superficie de CVE sem contrapartida.
+        -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>${bucket4j.version}</version>
+        </dependency>
+
+        <!-- Storage das imagens de evidencia: bucket do Railway, compativel com S3. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <exclusions>
+                <!--
+                    O cliente HTTP padrao do SDK e o Netty assincrono, que arrasta
+                    uma arvore grande de dependencias. Para enviar e assinar objeto
+                    o cliente sincrono baseado em HttpURLConnection basta.
+                -->
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>apache-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
@@ -71,6 +166,22 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
+        </dependency>
+
+        <!-- JUnit 5, AssertJ, Mockito e MockMvc. O projeto havia removido este
+             starter, o que deixava a suíte de testes impossível de escrever. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Banco em memória dos testes (perfil "test"). Não há Docker nesta
+             máquina, então Testcontainers não é opção. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
         </dependency>
 
         <dependency>

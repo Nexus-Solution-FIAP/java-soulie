@@ -11,6 +11,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -36,7 +37,7 @@ public class SoulieApiController {
     @PatchMapping
     @Operation(summary = "Renomeia ou troca a planta", description = "Tipos: girassol, rosa, hibisco, lavanda, margarida, orquidea, ipe_amarelo, guaimbe_ondulado, manaca_da_serra, maranta, pacova, pitangueira, rainha_do_abismo, trevo_roxo, mulungu, sucupira_preta, arvore_tecnologica.")
     public ResponseEntity<SoulieResponse> update(@Parameter(hidden = true) @AuthenticationPrincipal User user,
-                                                 @RequestBody UpdateSoulieRequest request) {
+                                                 @RequestBody @Valid UpdateSoulieRequest request) {
         return ResponseEntity.ok(soulieApiService.update(user, request));
     }
 
