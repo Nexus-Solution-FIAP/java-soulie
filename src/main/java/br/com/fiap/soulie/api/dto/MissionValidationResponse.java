@@ -8,8 +8,8 @@ import java.util.List;
  * Resultado do envio de uma foto de missão.
  *
  * <p><b>Nenhum campo foi removido ou renomeado</b> — o app do parceiro já
- * consome este contrato. Entraram apenas {@code validationId} e {@code status}.
- * Um cliente antigo continua desserializando normalmente e lê
+ * consome este contrato. Entraram {@code validationId}, {@code status} e
+ * {@code reason}. Um cliente antigo continua desserializando normalmente e lê
  * {@code xpGained: 0} enquanto a análise não terminou.
  *
  * <p>O que mudou de verdade é <i>quando</i> os valores ficam preenchidos. Antes
@@ -43,12 +43,16 @@ public record MissionValidationResponse(
 
         @Schema(example = "PENDING", allowableValues = {"PENDING", "APPROVED", "REJECTED", "FAILED"},
                 description = "PENDING: em análise. APPROVED: XP creditado. REJECTED: a foto não comprova. FAILED: não foi possível analisar, será reprocessada.")
-        String status
+        String status,
+
+        @Schema(example = "Não reconhecemos coleta seletiva nesta foto. Mostre as embalagens ou as lixeiras.",
+                description = "Motivo da IA. Preenchido principalmente em REJECTED; nulo enquanto PENDING.")
+        String reason
 ) {
 
     /** Resposta do envio: aceito para análise, nada creditado ainda. */
     public static MissionValidationResponse pendente(Long validationId, Long missionId) {
         return new MissionValidationResponse(
-                false, 0, missionId, List.of(), 0, null, null, validationId, "PENDING");
+                false, 0, missionId, List.of(), 0, null, null, validationId, "PENDING", null);
     }
 }

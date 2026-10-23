@@ -215,3 +215,16 @@ credita XP duas vezes.
 4. se vai responder na própria requisição ou pelo **webhook** — e, nesse caso,
    combinamos o segredo compartilhado;
 5. um tempo típico de resposta, para ajustarmos o timeout.
+
+---
+
+## 5. Quem implementa este contrato hoje
+
+O serviço Python está no repositório `soulie-validation-pictures`
+(`POST /v1/analisar`). No perfil `dev` a API chama
+`http://localhost:5000/v1/analisar` em modo `BYTES`. Suba o Python com
+`uvicorn app:app --port 5000` antes de validar foto pelo app.
+
+A IA escolhe a família visual pela `mission.tag` (mobilidade, reciclagem,
+alimentação, etc.). Só mobilidade tem classificador treinado; as outras famílias
+usam um fallback ImageNet até haver dataset + `python treinar.py --familia …`.

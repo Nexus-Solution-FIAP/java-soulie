@@ -244,7 +244,8 @@ public class MissionApiService {
                 badge,
                 next,
                 validation.getId(),
-                validation.getResultValidation().name()
+                validation.getResultValidation().name(),
+                validation.getReason()
         );
     }
 
@@ -295,7 +296,7 @@ public class MissionApiService {
      */
     @Transactional(readOnly = true)
     public MissionValidationResponse statusDaValidacao(User user, Long validationId) {
-        Validation validation = validationService.findById(validationId);
+        Validation validation = validationService.findDetalheById(validationId);
         var evidence = validation.getEvidence();
 
         // 404 tambem para validacao de terceiro, nao 403. Responder diferente

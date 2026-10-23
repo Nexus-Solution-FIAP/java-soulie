@@ -38,6 +38,11 @@ public class ImageValidationClient {
         this.imageStorage = imageStorage;
 
         HttpClient http = HttpClient.newBuilder()
+                // HTTP/1.1 de propósito: o JDK escolhe HTTP/2 por padrão, e o
+                // uvicorn da IA (h11) responde 400 "Invalid HTTP request received"
+                // para o preâmbulo h2c em http://localhost. HTTPS/ALPN do Expo
+                // não entra aqui — esta chamada é clara, na rede local.
+                .version(HttpClient.Version.HTTP_1_1)
                 .connectTimeout(properties.getConnectTimeout())
                 .build();
         var factory = new JdkClientHttpRequestFactory(http);
