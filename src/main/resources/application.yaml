@@ -2,12 +2,9 @@ spring:
   application:
     name: "soulie"
   profiles:
-    # Falha SEGURO: esquecer SPRING_PROFILES_ACTIVE faz rodar em prod, não em dev.
-    # O contrário (default dev) era um risco real: o perfil dev liga mensagens de
-    # erro detalhadas, e ninguém percebe que subiu em produção com elas ligadas.
-    # Para desenvolver, defina SPRING_PROFILES_ACTIVE=dev.
-    # Local sobe em dev (sem Rabbit/S3). Produção no Railway DEVE definir
-    # SPRING_PROFILES_ACTIVE=prod — senão o stub de IA e o disco local entram.
+    # Local (`./mvnw spring-boot:run`) sobe em dev: sem Rabbit/S3, Swagger ligado.
+    # A imagem Docker define SPRING_PROFILES_ACTIVE=prod. No Render, não apague
+    # essa variável — o perfil prod desliga Swagger e exige bucket + fila.
     default: dev
   datasource:
     url: "jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
@@ -66,6 +63,9 @@ spring:
     open-in-view: false
 
 server:
+  # Render (e outros PaaS) injeta PORT. Sem isto o Spring fica na 8080 e o
+  # proxy marca o serviço como morto. Local, sem PORT, continua 8080.
+  port: ${PORT:8080}
   error:
     # A chave correta é include-stacktrace. Antes estava escrita
     # "include-stacktracer", o que fazia a configuração não ter efeito nenhum.
@@ -128,6 +128,17 @@ soulie:
     wait-timeout: "${SOULIE_VALIDATE_WAIT:PT6S}"
     stub-approve: "${SOULIE_AI_STUB:false}"
 
+  chat:
+    # URL só daqui, nunca do body. Contrato OpenAI chat/completions (Groq ou
+    # Gemini compat). Sem URL ou sem chave, a Alma responde o FAQ local.
+    url: "${SOULIE_CHAT_LLM_URL:}"
+    api-key: "${SOULIE_CHAT_LLM_API_KEY:}"
+    model: "${SOULIE_CHAT_LLM_MODEL:qwen/qwen3.8-27b}"
+    connect-timeout: PT5S
+    read-timeout: "${SOULIE_CHAT_LLM_READ_TIMEOUT:PT20S}"
+    max-tokens: 600
+    temperature: 0.4
+
   cloudflare:
     # Ligue SÓ quando a API estiver de fato atrás do Cloudflare. Com isto
     # ligado, CF-Connecting-IP passa a ser aceito — mas apenas quando a conexão
@@ -175,6 +186,12 @@ soulie:
       - method: POST
         path: /api/v1/missions/*/validate
         capacity: 10
+        window: PT1H
+      # Chamada paga de LLM. Um padrão só para os dois prefixos contarem
+      # no mesmo balde (senão 20+20 virava 40/h por conta).
+      - method: POST
+        path: /**/chat/soulie-ia
+        capacity: 20
         window: PT1H
       # Seguir é vetor de spam e insumo de enumeração.
       - method: POST
