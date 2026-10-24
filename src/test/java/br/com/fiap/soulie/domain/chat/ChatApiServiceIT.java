@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.mockito.ArgumentCaptor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -125,12 +127,34 @@ class ChatApiServiceIT {
     @Test
     @DisplayName("Pergunta livre usa o LLM quando ele responde")
     void perguntaLivreUsaLlm() {
-        when(llmClient.complete(any(), any())).thenReturn(Optional.of("Olá, guardião. Plante uma muda hoje."));
+        when(llmClient.complete(any(), any()))
+                .thenReturn(Optional.of("Olá, guardião. Plante uma muda hoje."));
         var ana = tx.execute(status -> novoUsuario("Ana Livre", 5));
 
         String reply = chatApiService.reply(ana, new ChatRequest("Como eu ajudo o planeta?", null)).reply();
 
+        ArgumentCaptor<String> system = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> user = ArgumentCaptor.forClass(String.class);
+        verify(llmClient).complete(system.capture(), user.capture());
         assertThat(reply).isEqualTo("Olá, guardião. Plante uma muda hoje.");
+        assertThat(system.getValue()).contains("Você é **Alma**");
+        assertThat(system.getValue()).contains("Descarte, compostagem e hábitos");
+        assertThat(system.getValue()).doesNotContain("A01");
+        assertThat(user.getValue()).contains("FATOS:");
+        assertThat(user.getValue()).contains("Como eu ajudo o planeta?");
+        assertThat(user.getValue()).contains("XP do usuário: 5");
+    }
+
+    @Test
+    @DisplayName("Pergunta longa sobre XP vai ao LLM, não ao chip curto")
+    void perguntaLongaDeXpUsaLlm() {
+        when(llmClient.complete(any(), any())).thenReturn(Optional.of("Semente até 50 XP da espécie."));
+        var ana = tx.execute(status -> novoUsuario("Ana Estagio", 49));
+
+        String reply = chatApiService.reply(ana, new ChatRequest(
+                "Qual estágio com 49, 50, 99, 100, 199 e 200 XP da espécie?", null)).reply();
+
+        assertThat(reply).isEqualTo("Semente até 50 XP da espécie.");
     }
 
     @Test

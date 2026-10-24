@@ -27,7 +27,7 @@ public class ChatLlmProperties {
 
     private Duration readTimeout = Duration.ofSeconds(20);
 
-    private int maxTokens = 600;
+    private int maxTokens = 1000;
 
     private double temperature = 0.4;
 
