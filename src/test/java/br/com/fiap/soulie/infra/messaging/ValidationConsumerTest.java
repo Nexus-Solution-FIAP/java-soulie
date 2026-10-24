@@ -108,6 +108,23 @@ class ValidationConsumerTest {
                 .isEqualTo(depoisDaPrimeira);
     }
 
+    @Test
+    @DisplayName("IA vazia no processamento local resolve FAILED em vez de deixar PENDING")
+    void iaVaziaNoProcessamentoLocalResolveFailed() {
+        var dados = prepararValidacaoPendente("ia-vazia@soulie.com");
+
+        when(validationClient.validate(anyLong(), any(), any(), any(), any()))
+                .thenReturn(Optional.empty());
+
+        assertThatCode(() -> processor.processar(dados.validationId()))
+                .doesNotThrowAnyException();
+
+        assertThat(validationRepository.findById(dados.validationId()))
+                .get()
+                .extracting(Validation::getResultValidation)
+                .isEqualTo(ResultValidation.FAILED);
+    }
+
     private Dados prepararValidacaoPendente(String email) {
         var user = userRepository.save(User.builder()
                 .name("Consumidor").email(email).password("hash")
