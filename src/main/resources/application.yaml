@@ -114,10 +114,12 @@ soulie:
     api-key: "${AI_VALIDATION_API_KEY:}"
     # PRESIGNED_URL manda um link temporário; BYTES manda a imagem em base64.
     delivery-mode: "${AI_DELIVERY_MODE:PRESIGNED_URL}"
-    connect-timeout: PT5S
-    # Análise de imagem é lenta. Mas o limite tem de existir: sem ele, um worker
-    # fica preso para sempre numa IA que não responde.
-    read-timeout: "${AI_READ_TIMEOUT:PT30S}"
+    # Render free: o serviço Python dorme. O wake + bind costuma passar de 5s;
+    # com TensorFlow no startup, o POST nem chegava a ser logado na IA.
+    connect-timeout: "${AI_CONNECT_TIMEOUT:PT45S}"
+    # Análise de imagem é lenta, e a primeira depois do cold start carrega a
+    # MobileNet. Sem teto o worker fica preso; 90s cobre o load + inferência.
+    read-timeout: "${AI_READ_TIMEOUT:PT90S}"
     # Desligado por padrão. Só ligue se a IA do parceiro responder depois, em
     # vez de na própria chamada — um endpoint público a mais que ninguém usa é
     # só superfície de ataque.
@@ -125,7 +127,7 @@ soulie:
     webhook-secret: "${AI_WEBHOOK_SECRET:}"
     webhook-tolerance: PT5M
     callback-url: "${AI_CALLBACK_URL:}"
-    wait-timeout: "${SOULIE_VALIDATE_WAIT:PT6S}"
+    wait-timeout: "${SOULIE_VALIDATE_WAIT:PT20S}"
     stub-approve: "${SOULIE_AI_STUB:false}"
 
   chat:

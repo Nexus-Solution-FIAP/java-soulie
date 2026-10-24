@@ -27,7 +27,8 @@ soulie:
     type: s3
   ai:
     stub-approve: false
-    wait-timeout: PT6S
+    # 6s perdia o cold start da IA no Render e devolvia 202 cedo demais.
+    wait-timeout: PT20S
 
 springdoc:
   # A API não publica a própria superfície em produção. Enquanto o Cloudflare

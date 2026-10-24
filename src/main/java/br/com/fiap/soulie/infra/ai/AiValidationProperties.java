@@ -41,15 +41,16 @@ public class AiValidationProperties {
     /** Como a imagem chega até a IA. */
     private DeliveryMode deliveryMode = DeliveryMode.PRESIGNED_URL;
 
-    private Duration connectTimeout = Duration.ofSeconds(5);
+    private Duration connectTimeout = Duration.ofSeconds(45);
 
-    private Duration readTimeout = Duration.ofSeconds(30);
+    private Duration readTimeout = Duration.ofSeconds(90);
 
     /**
      * Quanto o {@code POST /validate} espera o veredito antes de devolver 202.
-     * {@code PT0S} desliga a espera. Padrão 6s, para o app receber XP no 200.
+     * {@code PT0S} desliga a espera. Padrão 20s: no Render a IA costuma passar
+     * dos 6s no cold start.
      */
-    private Duration waitTimeout = Duration.ofSeconds(6);
+    private Duration waitTimeout = Duration.ofSeconds(20);
 
     /**
      * Sem URL de IA, aprova a foto localmente. Só para {@code dev}: em
