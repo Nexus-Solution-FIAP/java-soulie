@@ -21,7 +21,12 @@ import br.com.fiap.soulie.domain.mission.UserMissionCompletionRepository;
 import br.com.fiap.soulie.domain.soulie.SoulieLevel;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
+import br.com.fiap.soulie.domain.evidence.Evidence;
+import br.com.fiap.soulie.domain.validation.Validation;
+import br.com.fiap.soulie.domain.validation.ValidationRepository;
 import br.com.fiap.soulie.infra.push.ExpoPushService;
+import br.com.fiap.soulie.infra.storage.ImageStorage;
+import br.com.fiap.soulie.infra.storage.ImageStorageProperties;
 import br.com.fiap.soulie.validations.community.FeedPostDeletionValidator;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.ValidationException;
@@ -29,6 +34,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -41,6 +47,7 @@ public class CommunityApiService {
 
     private static final int NUDGES_PER_FRIEND_PER_DAY = 3;
     private static final String[] COLORS = {"#0EA5E9", "#10B981", "#F43F5E", "#8B5CF6", "#F59E0B", "#06B6D4"};
+    private static final Duration FEED_IMAGE_TTL = Duration.ofHours(24);
 
     @Autowired
     private UserRepository userRepository;
@@ -77,6 +84,15 @@ public class CommunityApiService {
 
     @Autowired
     private List<FeedPostDeletionValidator> deletionValidators;
+
+    @Autowired
+    private ValidationRepository validationRepository;
+
+    @Autowired
+    private ImageStorage imageStorage;
+
+    @Autowired
+    private ImageStorageProperties storageProperties;
 
     @Transactional(readOnly = true)
     public List<RankingItemResponse> ranking(User current) {
@@ -122,7 +138,7 @@ public class CommunityApiService {
                 current,
                 gardenService.requireGarden(current),
                 request.text(),
-                request.imageUri(),
+                resolveStoredImage(current, request),
                 request.missionName(),
                 request.xp()
         ));
@@ -270,7 +286,7 @@ public class CommunityApiService {
                 feedLikeRepository.countByPost_Id(post.getId()),
                 (int) feedCommentRepository.countByPost_Id(post.getId()),
                 liked,
-                post.getImageUri(),
+                clientImageUrl(post.getImageUri()),
                 post.getMissionName(),
                 post.getXp(),
                 author.getId().equals(current.getId())
@@ -342,5 +358,63 @@ public class CommunityApiService {
             return "?";
         }
         return name.substring(0, 1).toUpperCase();
+    }
+
+    private String resolveStoredImage(User current, CreateFeedRequest request) {
+        if (request.validationId() != null) {
+            return imageFromApprovedValidation(current, request.validationId());
+        }
+        return httpUrlOrNull(request.imageUri());
+    }
+
+    private String imageFromApprovedValidation(User current, Long validationId) {
+        Validation validation = validationRepository.findDetalheById(validationId)
+                .orElseThrow(() -> new EntityNotFoundException("Validação não encontrada"));
+        Evidence evidence = validation.getEvidence();
+        if (evidence == null || evidence.getUser() == null
+                || !evidence.getUser().getId().equals(current.getId())) {
+            throw new ValidationException("Essa comprovação não é sua");
+        }
+        if (!validation.isApproved()) {
+            throw new ValidationException("Só é possível publicar uma missão aprovada");
+        }
+        String publicUrl = httpUrlOrNull(evidence.getImageUrl());
+        if (publicUrl != null) {
+            return publicUrl;
+        }
+        if (evidence.getImageKey() != null && !evidence.getImageKey().isBlank()) {
+            return evidence.getImageKey();
+        }
+        return null;
+    }
+
+    private String clientImageUrl(String stored) {
+        if (stored == null || stored.isBlank()) {
+            return null;
+        }
+        String http = httpUrlOrNull(stored);
+        if (http != null) {
+            return http;
+        }
+        try {
+            Duration configured = storageProperties.getPresignedUrlTtl();
+            Duration ttl = configured != null && configured.compareTo(FEED_IMAGE_TTL) > 0
+                    ? configured
+                    : FEED_IMAGE_TTL;
+            return httpUrlOrNull(imageStorage.presignedReadUrl(stored, ttl));
+        } catch (RuntimeException exception) {
+            return null;
+        }
+    }
+
+    private static String httpUrlOrNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.startsWith("https://") || trimmed.startsWith("http://")) {
+            return trimmed;
+        }
+        return null;
     }
 }

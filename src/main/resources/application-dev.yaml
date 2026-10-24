@@ -33,7 +33,7 @@ soulie:
     url: "${AI_VALIDATION_URL:http://localhost:5000/v1/analisar}"
     delivery-mode: "${AI_DELIVERY_MODE:BYTES}"
     stub-approve: "${SOULIE_AI_STUB:false}"
-    wait-timeout: PT6S
+    wait-timeout: "${SOULIE_VALIDATE_WAIT:PT6S}"
 
 logging:
   level:

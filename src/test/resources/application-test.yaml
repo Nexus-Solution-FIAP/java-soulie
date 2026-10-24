@@ -74,6 +74,10 @@ soulie:
     webhook-secret: "segredo-de-teste-do-webhook-com-tamanho-suficiente"
     wait-timeout: PT0S
     stub-approve: false
+  chat:
+    url: ""
+    api-key: ""
+    model: "qwen/qwen3.8-27b"
 
   cloudflare:
     enabled: false

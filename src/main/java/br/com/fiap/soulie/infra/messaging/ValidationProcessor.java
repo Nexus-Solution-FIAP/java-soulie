@@ -25,17 +25,20 @@ public class ValidationProcessor {
     private final ImageValidationClient validationClient;
     private final AiValidationProperties aiProperties;
     private final String callbackUrl;
+    private final boolean messagingEnabled;
 
     public ValidationProcessor(ValidationService validationService,
                                ValidationOutcomeService outcomeService,
                                ImageValidationClient validationClient,
                                AiValidationProperties aiProperties,
-                               @Value("${soulie.ai.callback-url:}") String callbackUrl) {
+                               @Value("${soulie.ai.callback-url:}") String callbackUrl,
+                               @Value("${soulie.messaging.enabled:false}") boolean messagingEnabled) {
         this.validationService = validationService;
         this.outcomeService = outcomeService;
         this.validationClient = validationClient;
         this.aiProperties = aiProperties;
         this.callbackUrl = callbackUrl;
+        this.messagingEnabled = messagingEnabled;
     }
 
     public void processar(Long validationId) {
@@ -63,6 +66,14 @@ public class ValidationProcessor {
                 aiProperties.isWebhookEnabled() ? callbackUrl : null);
 
         if (resultado.isEmpty()) {
+            // Sem fila não há retry nem DLQ: se relançar aqui, AFTER_COMMIT vira
+            // 500 (ou a evidência fica PENDING e trava o reenvio). Marca FAILED
+            // na hora — falha nossa, o usuário pode tentar de novo.
+            if (!messagingEnabled) {
+                log.warn("IA não respondeu para a validação {} (processamento local)", validationId);
+                outcomeService.aplicar(validationId, null);
+                return;
+            }
             throw new ValidacaoNaoConcluidaException(
                     "IA não respondeu para a validação " + validationId);
         }

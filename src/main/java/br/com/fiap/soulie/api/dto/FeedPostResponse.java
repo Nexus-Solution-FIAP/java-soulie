@@ -12,7 +12,7 @@ public record FeedPostResponse(
         @Schema(example = "2") long likes,
         @Schema(example = "1") int comments,
         @Schema(example = "false") boolean liked,
-        @Schema(example = "file:///foto.jpg") String imageUri,
+        @Schema(example = "https://cdn.example/foto.jpg") String imageUri,
         @Schema(example = "Ir de bike") String missionName,
         @Schema(example = "40") Integer xp,
         @Schema(example = "true", description = "True quando a publicação é do usuário logado") boolean mine

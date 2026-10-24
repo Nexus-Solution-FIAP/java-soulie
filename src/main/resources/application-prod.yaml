@@ -2,7 +2,9 @@
 #
 # Em produção, defina CORS_ALLOWED_ORIGINS explicitamente com as origens reais
 # do app e da web. O valor padrão do application.yaml aponta para localhost e
-# não serve aqui.
+# não serve aqui. Depois do deploy na Vercel, acrescente a origem HTTPS do site
+# (https://<projeto>.vercel.app ou o domínio custom). Preview *.vercel.app fica
+# de fora na v1 — o Spring compara origem exata.
 spring:
   jpa:
     show-sql: false
@@ -27,7 +29,8 @@ soulie:
     type: s3
   ai:
     stub-approve: false
-    wait-timeout: PT6S
+    # 6s perdia o cold start da IA no Render e devolvia 202 cedo demais.
+    wait-timeout: PT20S
 
 springdoc:
   # A API não publica a própria superfície em produção. Enquanto o Cloudflare

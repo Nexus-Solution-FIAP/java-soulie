@@ -2,12 +2,9 @@ spring:
   application:
     name: "soulie"
   profiles:
-    # Falha SEGURO: esquecer SPRING_PROFILES_ACTIVE faz rodar em prod, não em dev.
-    # O contrário (default dev) era um risco real: o perfil dev liga mensagens de
-    # erro detalhadas, e ninguém percebe que subiu em produção com elas ligadas.
-    # Para desenvolver, defina SPRING_PROFILES_ACTIVE=dev.
-    # Local sobe em dev (sem Rabbit/S3). Produção no Railway DEVE definir
-    # SPRING_PROFILES_ACTIVE=prod — senão o stub de IA e o disco local entram.
+    # Local (`./mvnw spring-boot:run`) sobe em dev: sem Rabbit/S3, Swagger ligado.
+    # A imagem Docker define SPRING_PROFILES_ACTIVE=prod. No Render, não apague
+    # essa variável — o perfil prod desliga Swagger e exige bucket + fila.
     default: dev
   datasource:
     url: "jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
@@ -66,6 +63,9 @@ spring:
     open-in-view: false
 
 server:
+  # Render (e outros PaaS) injeta PORT. Sem isto o Spring fica na 8080 e o
+  # proxy marca o serviço como morto. Local, sem PORT, continua 8080.
+  port: ${PORT:8080}
   error:
     # A chave correta é include-stacktrace. Antes estava escrita
     # "include-stacktracer", o que fazia a configuração não ter efeito nenhum.
@@ -84,6 +84,8 @@ api:
       expiration: "${JWT_EXPIRATION:PT2H}"
   cors:
     # Lista explícita de origens. Curinga não é aceito aqui.
+    # Inclua a URL HTTPS da Vercel em CORS_ALLOWED_ORIGINS no Render
+    # (ex.: https://soulie-app.vercel.app) depois do primeiro deploy do site.
     allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8081}"
 
 soulie:
@@ -114,10 +116,12 @@ soulie:
     api-key: "${AI_VALIDATION_API_KEY:}"
     # PRESIGNED_URL manda um link temporário; BYTES manda a imagem em base64.
     delivery-mode: "${AI_DELIVERY_MODE:PRESIGNED_URL}"
-    connect-timeout: PT5S
-    # Análise de imagem é lenta. Mas o limite tem de existir: sem ele, um worker
-    # fica preso para sempre numa IA que não responde.
-    read-timeout: "${AI_READ_TIMEOUT:PT30S}"
+    # Render free: o serviço Python dorme. O wake + bind costuma passar de 5s;
+    # com TensorFlow no startup, o POST nem chegava a ser logado na IA.
+    connect-timeout: "${AI_CONNECT_TIMEOUT:PT45S}"
+    # Análise de imagem é lenta, e a primeira depois do cold start carrega a
+    # MobileNet. Sem teto o worker fica preso; 90s cobre o load + inferência.
+    read-timeout: "${AI_READ_TIMEOUT:PT90S}"
     # Desligado por padrão. Só ligue se a IA do parceiro responder depois, em
     # vez de na própria chamada — um endpoint público a mais que ninguém usa é
     # só superfície de ataque.
@@ -125,8 +129,19 @@ soulie:
     webhook-secret: "${AI_WEBHOOK_SECRET:}"
     webhook-tolerance: PT5M
     callback-url: "${AI_CALLBACK_URL:}"
-    wait-timeout: "${SOULIE_VALIDATE_WAIT:PT6S}"
+    wait-timeout: "${SOULIE_VALIDATE_WAIT:PT20S}"
     stub-approve: "${SOULIE_AI_STUB:false}"
+
+  chat:
+    # URL só daqui, nunca do body. Contrato OpenAI chat/completions (Groq ou
+    # Gemini compat). Sem URL ou sem chave, a Alma responde o FAQ local.
+    url: "${SOULIE_CHAT_LLM_URL:}"
+    api-key: "${SOULIE_CHAT_LLM_API_KEY:}"
+    model: "${SOULIE_CHAT_LLM_MODEL:qwen/qwen3.8-27b}"
+    connect-timeout: PT5S
+    read-timeout: "${SOULIE_CHAT_LLM_READ_TIMEOUT:PT20S}"
+    max-tokens: 1000
+    temperature: 0.4
 
   cloudflare:
     # Ligue SÓ quando a API estiver de fato atrás do Cloudflare. Com isto
@@ -175,6 +190,12 @@ soulie:
       - method: POST
         path: /api/v1/missions/*/validate
         capacity: 10
+        window: PT1H
+      # Chamada paga de LLM. Um padrão só para os dois prefixos contarem
+      # no mesmo balde (senão 20+20 virava 40/h por conta).
+      - method: POST
+        path: /**/chat/soulie-ia
+        capacity: 20
         window: PT1H
       # Seguir é vetor de spam e insumo de enumeração.
       - method: POST
