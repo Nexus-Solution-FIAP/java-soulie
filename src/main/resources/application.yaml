@@ -84,6 +84,8 @@ api:
       expiration: "${JWT_EXPIRATION:PT2H}"
   cors:
     # Lista explícita de origens. Curinga não é aceito aqui.
+    # Inclua a URL HTTPS da Vercel em CORS_ALLOWED_ORIGINS no Render
+    # (ex.: https://soulie-app.vercel.app) depois do primeiro deploy do site.
     allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8081}"
 
 soulie:
@@ -138,7 +140,7 @@ soulie:
     model: "${SOULIE_CHAT_LLM_MODEL:qwen/qwen3.8-27b}"
     connect-timeout: PT5S
     read-timeout: "${SOULIE_CHAT_LLM_READ_TIMEOUT:PT20S}"
-    max-tokens: 600
+    max-tokens: 1000
     temperature: 0.4
 
   cloudflare:

@@ -8,6 +8,7 @@ import br.com.fiap.soulie.domain.mission.DailyMissionRepository;
 import br.com.fiap.soulie.domain.mission.UserMissionCompletionRepository;
 import br.com.fiap.soulie.domain.user.User;
 import br.com.fiap.soulie.domain.user.UserRepository;
+import br.com.fiap.soulie.infra.chat.ChatKnowledge;
 import br.com.fiap.soulie.infra.chat.LlmClient;
 import br.com.fiap.soulie.validations.chat.ChatRequestValidator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,14 +24,11 @@ import java.util.stream.Collectors;
 @Service
 public class ChatApiService {
 
-    private static final String SYSTEM_PROMPT = """
-            Você é a Alma, guia do app Soulie (pt-BR).
-            Responda só com os FATOS abaixo. Não invente missão, XP, ranking nem regra.
-            Se o fato não estiver no bloco, diga para olhar as missões do dia no app.
-            Tom curto, amigável, no máximo 6 linhas. Pode usar **negrito**.
-            Não fale de política, saúde clínica nem de outros apps.
-            A foto da missão é validada por outra IA: peça evidência nítida, sem recorte da internet.
-            """;
+    /**
+     * Chips da tela são frases curtas ("Missões", "Sistema XP"). Perguntas
+     * longas que só citam a palavra passam pelo LLM com a base de conhecimento.
+     */
+    static final int LIMITE_CHIP = 48;
 
     @Autowired
     private DailyMissionRepository dailyMissionRepository;
@@ -43,6 +41,9 @@ public class ChatApiService {
 
     @Autowired
     private LlmClient llmClient;
+
+    @Autowired
+    private ChatKnowledge chatKnowledge;
 
     @Autowired
     private List<ChatRequestValidator> validators;
@@ -64,7 +65,7 @@ public class ChatApiService {
             return new ChatReply(respostaEstruturada(questionLower, grounding));
         }
 
-        Optional<String> gerada = llmClient.complete(SYSTEM_PROMPT, userPrompt(question, grounding));
+        Optional<String> gerada = llmClient.complete(chatKnowledge.systemPrompt(), userPrompt(question, grounding));
         return gerada.map(ChatReply::new)
                 .orElseGet(() -> new ChatReply(respostaEstruturada(questionLower, grounding)));
     }
@@ -110,6 +111,9 @@ public class ChatApiService {
     }
 
     private static boolean intencaoEstruturada(String question) {
+        if (question.length() > LIMITE_CHIP) {
+            return false;
+        }
         return perguntaMissao(question) || perguntaDica(question)
                 || perguntaXp(question) || perguntaRanking(question);
     }

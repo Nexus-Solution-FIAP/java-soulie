@@ -60,7 +60,7 @@ class FeedPostDeleteIntegrationTest {
         var garden = gardenService.openMine(ana);
         gardenService.join(bia, garden.inviteCode());
 
-        var post = communityApiService.publish(ana, new CreateFeedRequest("Fui de bike.", null, null, null));
+        var post = communityApiService.publish(ana, new CreateFeedRequest("Fui de bike.", null, null, null, null));
         assertThat(post.mine()).isTrue();
         communityApiService.toggleLike(bia, post.id());
         communityApiService.comment(bia, post.id(), new CreateCommentRequest("Mandou bem"));
@@ -80,7 +80,7 @@ class FeedPostDeleteIntegrationTest {
         var bia = novoUsuario("Bia");
         var garden = gardenService.openMine(ana);
         gardenService.join(bia, garden.inviteCode());
-        var post = communityApiService.publish(ana, new CreateFeedRequest("Plantei uma muda.", null, null, null));
+        var post = communityApiService.publish(ana, new CreateFeedRequest("Plantei uma muda.", null, null, null, null));
 
         assertThatThrownBy(() -> communityApiService.deletePost(bia, post.id()))
                 .isInstanceOf(AccessDeniedException.class);
@@ -94,7 +94,7 @@ class FeedPostDeleteIntegrationTest {
         var carla = novoUsuario("Carla");
         gardenService.openMine(ana);
         gardenService.openMine(carla);
-        var post = communityApiService.publish(ana, new CreateFeedRequest("Só no meu jardim.", null, null, null));
+        var post = communityApiService.publish(ana, new CreateFeedRequest("Só no meu jardim.", null, null, null, null));
 
         assertThatThrownBy(() -> communityApiService.deletePost(carla, post.id()))
                 .isInstanceOf(EntityNotFoundException.class);
@@ -108,7 +108,7 @@ class FeedPostDeleteIntegrationTest {
         var bia = novoUsuario("Bia");
         var garden = gardenService.openMine(ana);
         gardenService.join(bia, garden.inviteCode());
-        var post = communityApiService.publish(ana, new CreateFeedRequest("Vou sair do jardim.", null, null, null));
+        var post = communityApiService.publish(ana, new CreateFeedRequest("Vou sair do jardim.", null, null, null, null));
         gardenService.leave(ana);
 
         communityApiService.deletePost(ana, post.id());

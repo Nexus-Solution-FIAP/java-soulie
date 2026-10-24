@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping({"/api/v1/chat", "/v1/chat"})
 @SecurityRequirement(name = "bearer-key")
-@Tag(name = "Soulie IA", description = "Alma: LLM ancorado nas missões e no ranking reais; sem chave, cai no FAQ")
+@Tag(name = "Soulie IA", description = "Alma: LLM com persona e base de conhecimento do Soulie, ancorado nas missões e no ranking reais; sem chave, cai no FAQ")
 public class ChatController {
 
     @Autowired
@@ -29,7 +29,7 @@ public class ChatController {
     @PostMapping("/soulie-ia")
     @Operation(
             summary = "Pergunta para a Soulie IA",
-            description = "Envie a mensagem e, se a tela tiver uma missão aberta, o contexto dela. Chips de missões, ranking e XP respondem com dado do banco. Texto livre passa pelo LLM quando configurado.")
+            description = "Envie a mensagem e, se a tela tiver uma missão aberta, o contexto dela. Chips curtos de missões, ranking e XP respondem com dado do banco. Texto livre passa pelo LLM com a base de conhecimento da Alma quando configurado.")
     public ResponseEntity<ChatReply> soulieIa(@Parameter(hidden = true) @AuthenticationPrincipal User user, @RequestBody @Valid ChatRequest request) {
         return ResponseEntity.ok(chatApiService.reply(user, request));
     }
