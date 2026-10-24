@@ -1,0 +1,46 @@
+# Perfil de produção. Ative com SPRING_PROFILES_ACTIVE=prod.
+#
+# Em produção, defina CORS_ALLOWED_ORIGINS explicitamente com as origens reais
+# do app e da web. O valor padrão do application.yaml aponta para localhost e
+# não serve aqui.
+spring:
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    validate-on-migrate: true
+    # Nunca limpar o banco em produção, nem por acidente de configuração.
+    clean-disabled: true
+
+logging:
+  level:
+    root: INFO
+    br.com.fiap.soulie: INFO
+    org.hibernate.SQL: WARN
+
+soulie:
+  messaging:
+    enabled: true
+  storage:
+    type: s3
+  ai:
+    stub-approve: false
+    wait-timeout: PT6S
+
+springdoc:
+  # A API não publica a própria superfície em produção. Enquanto o Cloudflare
+  # Access (Fase 6) não estiver no lugar, Swagger e /v3/api-docs abertos
+  # entregariam o mapa completo de rotas a qualquer um.
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+server:
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+    include-exception: false

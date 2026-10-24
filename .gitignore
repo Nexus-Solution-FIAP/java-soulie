@@ -31,3 +31,13 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Segredos (nunca comitar) ###
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+
+### Storage local (perfil dev) ###
+data/

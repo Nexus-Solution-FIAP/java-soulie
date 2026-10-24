@@ -1,0 +1,213 @@
+spring:
+  application:
+    name: "soulie"
+  profiles:
+    # Falha SEGURO: esquecer SPRING_PROFILES_ACTIVE faz rodar em prod, não em dev.
+    # O contrário (default dev) era um risco real: o perfil dev liga mensagens de
+    # erro detalhadas, e ninguém percebe que subiu em produção com elas ligadas.
+    # Para desenvolver, defina SPRING_PROFILES_ACTIVE=dev.
+    # Local sobe em dev (sem Rabbit/S3). Produção no Railway DEVE definir
+    # SPRING_PROFILES_ACTIVE=prod — senão o stub de IA e o disco local entram.
+    default: dev
+  datasource:
+    url: "jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    username: "${DB_USER}"
+    password: "${DB_PASSWORD}"
+    driver-class-name: "org.postgresql.Driver"
+  flyway:
+    # Atenção: a pasta tem PONTO, não barra (src/main/resources/db.migrations).
+    # Migration criada em db/migration é ignorada em silêncio.
+    locations: classpath:db.migrations
+    baseline-on-migrate: true
+    baseline-version: 0
+  data:
+    redis:
+      # A autoconfiguração do Redis não aceita host vazio, então o padrão é
+      # localhost. Quem decide se o Redis é usado de fato é
+      # `soulie.ratelimit.distributed` — com ela em false, a conexão nunca é
+      # aberta e o limite vale por instância.
+      host: "${REDIS_HOST:localhost}"
+      port: "${REDIS_PORT:6379}"
+      password: "${REDIS_PASSWORD:}"
+      timeout: 2s
+      connect-timeout: 2s
+    web:
+      pageable:
+        # Teto de paginação. Sem isto, `GET /user?size=2000` funcionava e dava
+        # para varrer a base inteira numa requisição.
+        max-page-size: 50
+        default-page-size: 20
+  rabbitmq:
+    host: "${RABBITMQ_HOST:localhost}"
+    port: "${RABBITMQ_PORT:5672}"
+    username: "${RABBITMQ_USER:guest}"
+    password: "${RABBITMQ_PASSWORD:guest}"
+    virtual-host: "${RABBITMQ_VHOST:/}"
+    listener:
+      simple:
+        # Tentativas no proprio consumidor antes de a mensagem ir para a DLQ.
+        # Sem isto, a mensagem volta para a fila em laco infinito e ocupa o
+        # worker para sempre.
+        retry:
+          enabled: true
+          max-attempts: 4
+          initial-interval: 2s
+          multiplier: 3
+          max-interval: 1m
+        # Com retry esgotado, rejeita SEM reenfileirar: e isso que faz a
+        # mensagem cair na dead-letter exchange em vez de voltar para o fim da
+        # fila de novo.
+        default-requeue-rejected: false
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  jpa:
+    open-in-view: false
+
+server:
+  error:
+    # A chave correta é include-stacktrace. Antes estava escrita
+    # "include-stacktracer", o que fazia a configuração não ter efeito nenhum.
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+
+api:
+  security:
+    token:
+      # Sem valor padrão de propósito. Se a variável faltar, a aplicação NÃO sobe
+      # — é melhor falhar no boot que rodar com um segredo público e previsível.
+      # Gere com: openssl rand -base64 48
+      secret_jwt: "${SECRET_JWT}"
+      # Formato ISO-8601 de duração: PT2H = 2 horas.
+      expiration: "${JWT_EXPIRATION:PT2H}"
+  cors:
+    # Lista explícita de origens. Curinga não é aceito aqui.
+    allowed-origins: "${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:5173,http://localhost:8081}"
+
+soulie:
+  messaging:
+    # false = processa a validação no mesmo processo, sem RabbitMQ.
+    enabled: ${SOULIE_MESSAGING_ENABLED:false}
+
+  storage:
+    # local = disco (dev). s3 = bucket (prod).
+    type: "${SOULIE_STORAGE_TYPE:local}"
+    local-dir: "${SOULIE_LOCAL_STORAGE:data/soulie-images}"
+    # Bucket compatível com S3. Em produção é o object storage do Railway.
+    endpoint: "${S3_ENDPOINT:}"
+    region: "${S3_REGION:auto}"
+    bucket: "${S3_BUCKET:}"
+    access-key: "${S3_ACCESS_KEY:}"
+    secret-key: "${S3_SECRET_KEY:}"
+    # Vazio = bucket privado. A IA lê por URL assinada, que expira.
+    public-base-url: "${S3_PUBLIC_BASE_URL:}"
+    presigned-url-ttl: "${S3_PRESIGNED_TTL:PT15M}"
+    max-bytes: 10485760
+
+  ai:
+    # A URL vem SÓ daqui, nunca de entrada do usuário: o worker faz uma
+    # requisição de saída para este endereço, e aceitar valor do usuário
+    # transformaria o worker num proxy de SSRF contra a rede interna.
+    url: "${AI_VALIDATION_URL:}"
+    api-key: "${AI_VALIDATION_API_KEY:}"
+    # PRESIGNED_URL manda um link temporário; BYTES manda a imagem em base64.
+    delivery-mode: "${AI_DELIVERY_MODE:PRESIGNED_URL}"
+    connect-timeout: PT5S
+    # Análise de imagem é lenta. Mas o limite tem de existir: sem ele, um worker
+    # fica preso para sempre numa IA que não responde.
+    read-timeout: "${AI_READ_TIMEOUT:PT30S}"
+    # Desligado por padrão. Só ligue se a IA do parceiro responder depois, em
+    # vez de na própria chamada — um endpoint público a mais que ninguém usa é
+    # só superfície de ataque.
+    webhook-enabled: "${AI_WEBHOOK_ENABLED:false}"
+    webhook-secret: "${AI_WEBHOOK_SECRET:}"
+    webhook-tolerance: PT5M
+    callback-url: "${AI_CALLBACK_URL:}"
+    wait-timeout: "${SOULIE_VALIDATE_WAIT:PT6S}"
+    stub-approve: "${SOULIE_AI_STUB:false}"
+
+  cloudflare:
+    # Ligue SÓ quando a API estiver de fato atrás do Cloudflare. Com isto
+    # ligado, CF-Connecting-IP passa a ser aceito — mas apenas quando a conexão
+    # vem das faixas abaixo. Aceitar o cabeçalho de qualquer origem é bypass
+    # direto: basta mandar um IP diferente por requisição.
+    enabled: "${CLOUDFLARE_ENABLED:false}"
+    # Vazio usa as faixas publicadas pelo Cloudflare, embutidas na aplicação.
+    trusted-ips: "${CLOUDFLARE_TRUSTED_IPS:}"
+
+  ratelimit:
+    enabled: "${RATE_LIMIT_ENABLED:true}"
+    # Ligue quando houver um Redis provisionado. Com false, o limite é por
+    # instância: continua barrando o abuso óbvio, mas com N instâncias o teto
+    # real é N vezes maior.
+    distributed: "${RATE_LIMIT_DISTRIBUTED:false}"
+    # Teto de contadores do modo em memoria. Existe porque sem ele o
+    # proprio limitador derruba o processo: a chave inclui o IP de quem
+    # chama, e um mapa que nunca remove entrada cresce com cada origem
+    # distinta da internet ate dar OutOfMemoryError.
+    max-in-memory-entries: "${RATE_LIMIT_MAX_ENTRIES:100000}"
+    default-capacity: 120
+    default-window: PT1M
+    rules:
+      # Rotas públicas: a chave é o IP, porque ainda não há usuário.
+      - method: POST
+        path: /login
+        capacity: 5
+        window: PT1M
+        by-ip: true
+      - method: POST
+        path: /user
+        capacity: 3
+        window: PT1H
+        by-ip: true
+      - method: POST
+        path: /webhooks/validations
+        capacity: 60
+        window: PT1M
+        by-ip: true
+      # Upload mais chamada PAGA de IA.
+      - method: POST
+        path: /v1/missions/*/validate
+        capacity: 10
+        window: PT1H
+      - method: POST
+        path: /api/v1/missions/*/validate
+        capacity: 10
+        window: PT1H
+      # Seguir é vetor de spam e insumo de enumeração.
+      - method: POST
+        path: /v1/social/follow/*
+        capacity: 30
+        window: PT1H
+      - method: POST
+        path: /api/v1/social/follow/*
+        capacity: 30
+        window: PT1H
+      # Listas do grafo: amplificação de consulta.
+      - method: GET
+        path: /v1/social/**
+        capacity: 60
+        window: PT1H
+      - method: GET
+        path: /api/v1/social/**
+        capacity: 60
+        window: PT1H
+      # Spam no feed.
+      - method: POST
+        path: /v1/community/feed/**
+        capacity: 20
+        window: PT1H
+      - method: POST
+        path: /api/v1/community/feed/**
+        capacity: 20
+        window: PT1H
+      - method: DELETE
+        path: /v1/community/feed/*
+        capacity: 20
+        window: PT1H
+      - method: DELETE
+        path: /api/v1/community/feed/*
+        capacity: 20
+        window: PT1H

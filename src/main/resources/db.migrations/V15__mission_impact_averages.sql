@@ -1,0 +1,10 @@
+UPDATE daily_missions SET co2_saved_kg = 0.35, water_saved_liters = 0 WHERE name = 'Reciclar Resíduos';
+UPDATE daily_missions SET co2_saved_kg = 1.60, water_saved_liters = 0 WHERE name = 'Transporte Público';
+UPDATE daily_missions SET co2_saved_kg = 0.12, water_saved_liters = 60 WHERE name = 'Economia de Água';
+UPDATE daily_missions SET co2_saved_kg = 0.25, water_saved_liters = 0 WHERE name = 'Compra Consciente';
+UPDATE daily_missions SET co2_saved_kg = 0.12, water_saved_liters = 0 WHERE name = 'Energia Limpa';
+UPDATE daily_missions SET co2_saved_kg = 0.50, water_saved_liters = 0 WHERE name = 'Compostagem';
+UPDATE daily_missions SET co2_saved_kg = 1.50, water_saved_liters = 0 WHERE name = 'Refeição Sem Carne';
+UPDATE daily_missions SET co2_saved_kg = 0.04, water_saved_liters = 0 WHERE name = 'Luz Natural';
+UPDATE daily_missions SET co2_saved_kg = 2.00, water_saved_liters = 0 WHERE name = 'Plantar uma Muda';
+UPDATE daily_missions SET co2_saved_kg = 0.15, water_saved_liters = 0 WHERE name = 'Zero Descartáveis';

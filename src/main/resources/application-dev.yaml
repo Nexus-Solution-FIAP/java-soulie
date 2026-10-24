@@ -1,0 +1,47 @@
+# Perfil de desenvolvimento. Ativo por padrão (spring.profiles.default: dev).
+#
+# As variáveis DB_* e SECRET_JWT continuam obrigatórias — veja .env.example.
+# RabbitMQ e S3 NÃO são obrigatórios aqui: foto vai para disco e a validação
+# roda no mesmo processo. A IA padrão é o Python em localhost:5000.
+spring:
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    # Em desenvolvimento, falhar cedo se uma migration já aplicada foi editada.
+    validate-on-migrate: true
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.amqp.autoconfigure.RabbitAutoConfiguration
+
+soulie:
+  messaging:
+    enabled: false
+  storage:
+    type: local
+    local-dir: data/soulie-images
+  ai:
+    # A IA local é o repo soulie-validation-pictures (uvicorn na :5000).
+    # Se o Python não estiver no ar, deixe AI_VALIDATION_URL vazio e
+    # SOULIE_AI_STUB=true para voltar a aprovar tudo no dev.
+    url: "${AI_VALIDATION_URL:http://localhost:5000/v1/analisar}"
+    delivery-mode: "${AI_DELIVERY_MODE:BYTES}"
+    stub-approve: "${SOULIE_AI_STUB:false}"
+    wait-timeout: PT6S
+
+logging:
+  level:
+    br.com.fiap.soulie: DEBUG
+    org.springframework.security: INFO
+
+# Nada de `include-message: always` aqui. Essa chave vale para as respostas do
+# /error, que são justamente os caminhos que o @RestControllerAdvice NÃO cobre
+# (exceção escapando de filtro, por exemplo) — era por ali que a mensagem crua do
+# banco voltava a sair na resposta. O id de correlação do ErrorHandler já dá
+# rastreabilidade suficiente para depurar, sem expor nada.
