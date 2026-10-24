@@ -2,12 +2,9 @@ spring:
   application:
     name: "soulie"
   profiles:
-    # Falha SEGURO: esquecer SPRING_PROFILES_ACTIVE faz rodar em prod, não em dev.
-    # O contrário (default dev) era um risco real: o perfil dev liga mensagens de
-    # erro detalhadas, e ninguém percebe que subiu em produção com elas ligadas.
-    # Para desenvolver, defina SPRING_PROFILES_ACTIVE=dev.
-    # Local sobe em dev (sem Rabbit/S3). Produção no Railway DEVE definir
-    # SPRING_PROFILES_ACTIVE=prod — senão o stub de IA e o disco local entram.
+    # Local (`./mvnw spring-boot:run`) sobe em dev: sem Rabbit/S3, Swagger ligado.
+    # A imagem Docker define SPRING_PROFILES_ACTIVE=prod. No Render, não apague
+    # essa variável — o perfil prod desliga Swagger e exige bucket + fila.
     default: dev
   datasource:
     url: "jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
@@ -66,6 +63,9 @@ spring:
     open-in-view: false
 
 server:
+  # Render (e outros PaaS) injeta PORT. Sem isto o Spring fica na 8080 e o
+  # proxy marca o serviço como morto. Local, sem PORT, continua 8080.
+  port: ${PORT:8080}
   error:
     # A chave correta é include-stacktrace. Antes estava escrita
     # "include-stacktracer", o que fazia a configuração não ter efeito nenhum.
