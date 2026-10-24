@@ -82,6 +82,7 @@ public class ImageValidationClient {
             return Optional.empty();
         }
 
+        long started = System.nanoTime();
         try {
             // montarRequisicao DENTRO do try: ele gera a URL assinada, e para
             // evidencia do fluxo legado o imageKey e nulo -- o SDK lancava
@@ -102,6 +103,7 @@ public class ImageValidationClient {
                     .retrieve()
                     .body(ImageValidationContract.Result.class);
 
+            log.info("IA respondeu validação {} em {} ms", validationId, elapsedMs(started));
             if (resultado == null || resultado.status() == null) {
                 log.warn("IA respondeu sem status para a validação {}", validationId);
                 return Optional.empty();
@@ -112,8 +114,8 @@ public class ImageValidationClient {
             // chamada, e com ela a URL assinada da foto de uma pessoa. A chave de
             // API vai no cabeçalho Authorization, nunca na URL. O detalhe fica no
             // debug.
-            log.warn("Falha ao chamar a IA para a validação {}: {}",
-                    validationId, exception.getClass().getSimpleName());
+            log.warn("Falha ao chamar a IA para a validação {} após {} ms: {}",
+                    validationId, elapsedMs(started), exception.getClass().getSimpleName());
             log.debug("Detalhe da falha na validação {}", validationId, exception);
             return Optional.empty();
         }
@@ -137,5 +139,9 @@ public class ImageValidationClient {
         String url = imageStorage.presignedReadUrl(imageKey, null);
         return new ImageValidationContract.Request(
                 validationId, url, null, contentType, mission, callbackUrl);
+    }
+
+    private static long elapsedMs(long startedNanos) {
+        return (System.nanoTime() - startedNanos) / 1_000_000L;
     }
 }
